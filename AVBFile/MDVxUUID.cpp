@@ -6,6 +6,8 @@
 //  Copyright © 2020 DJFio. All rights reserved.
 //
 
+// Handle Windows cases - Michael Haephrati
+// ----------------------------------------
 #ifdef _MSC_VER
 #include "vcProj/stdafx.h"
 #else
@@ -14,7 +16,7 @@
 #endif
 #include "MDVxUUID.hpp"
 
-
+using namespace std;
 
 MDVxUUID &MDVxUUID::makeFrom2(char * b){memcpy(UMIDx+16, b, 8);return *this;}
 MDVxUUID &MDVxUUID::makeFrom8(char * b){memcpy(UMIDx, b, 32);return *this;}

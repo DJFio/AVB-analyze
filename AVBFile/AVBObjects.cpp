@@ -6,6 +6,8 @@
 //  Copyright © 2020 DJFio. All rights reserved.
 //
 
+// Handle Windows cases - Michael Haephrati
+// ----------------------------------------
 #ifdef _MSC_VER
 #include "vcproj\stdafx.h"
 #else
@@ -15,21 +17,26 @@
 #include "AVBObjects.hpp"
 #include "Printer.hpp"
 
+// Handle Windows cases - Michael Haephrati
+// ----------------------------------------
 #ifndef _MSC_VER
 #include "cout_redirect.hpp"
-#endif
 
 #ifndef redir_cout
 #define redir_cout
 #ifndef redir_flush
 #define redir_flush
-#endif
-#endif
+#endif	// redir_cout
+#endif	// redir_flush
+#endif	// _MSC_VER
 
 //*****************************************************************
 //Base ATOM class
 //*****************************************************************
 
+
+// Handle Windows cases - Michael Haephrati
+// ----------------------------------------
 #ifndef _MSC_VER
 #pragma mark *** ATOM::Atom base ***
 #endif
@@ -111,6 +118,8 @@ std::string avbATOM::dump(void) {
     return log.str();
 };
 
+// Handle Windows cases - Michael Haephrati
+// ----------------------------------------
 #ifndef _MSC_VER
 #pragma mark *** OBJD::Atom ***
 #endif
@@ -214,6 +223,8 @@ bool atom_OBJD::read(std::ifstream *f){
         return log.str();
     }
 
+// Handle Windows cases - Michael Haephrati
+// ----------------------------------------
 #ifndef _MSC_VER
 
 #pragma mark ******************* Bin ***
@@ -345,7 +356,8 @@ std::string atom_ABIN::dump(void){
     return log.str();
 }
 
-
+// Handle Windows cases - Michael Haephrati
+// ----------------------------------------
 #ifndef _MSC_VER
 
 #pragma mark ******************* Components ***
@@ -460,7 +472,8 @@ std::string atom_FILE::dump(void) {
     return log.str();
 };
 
-
+// Handle Windows cases - Michael Haephrati
+// ----------------------------------------
 #ifndef _MSC_VER
 
 #pragma mark *** URLL::Atom *** URLLocator
@@ -534,6 +547,8 @@ std::string atom_MSML::dump(void) {
     
     return log.str();
 };
+// Handle Windows cases - Michael Haephrati
+// ----------------------------------------
 #ifndef _MSC_VER
 
 #pragma mark *** APOS::Atom ***
@@ -644,6 +659,8 @@ std::string atom_ATTR::dump(void) {
     return log.str();
 };
 
+// Handle Windows cases - Michael Haephrati
+// ----------------------------------------
 #ifndef _MSC_VER
 #pragma mark *** PRLS::Atom *** (Parameter list)
 #pragma mark *** TMCS::Atom *** (Marker List)
@@ -681,6 +698,8 @@ std::string atom_ATTR::dump(void) {
 //    return log.str();
 //};
 
+// Handle Windows cases - Michael Haephrati
+// ----------------------------------------
 #ifndef _MSC_VER
 #pragma mark *** avbTOC::Methods ***
 #endif

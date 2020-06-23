@@ -11,6 +11,8 @@
 //  Copyright © 2020 DJFio. All rights reserved.
 //*******************************************************************************************************************************
 
+// Handle Windows cases - Michael Haephrati
+// ----------------------------------------
 #ifdef _MSC_VER
 #include "vcproj\stdafx.h"
 #else
@@ -18,13 +20,12 @@
 #include <fstream>
 #include <sstream>
 #endif
-
+// Handle Windows cases - Michael Haephrati
+// ----------------------------------------
 #ifndef _MSC_VER
 #include "cout_redirect.hpp"
 #endif
-#ifdef _MSC_VER
-#include <assert.h>
-#endif
+
 
 
 #include "utility.h"

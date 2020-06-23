@@ -6,10 +6,14 @@
 //  Copyright © 2020 DJFio. All rights reserved.
 //
 
+
+
 #ifndef printer_hpp
 #define printer_hpp
 #include "MDVxUUID.hpp"
 #include "Decoder.hpp"
+
+
 
 class Printer {
 public:
@@ -32,6 +36,18 @@ private:
     char printbuffer[84] = {"{ xxxxxxxx::xxxxxxxx::xxxxxxxx::xxxxxxxx::xxxxxxxx::xxxxxxxx::xxxxxxxx::xxxxxxxx }\0"};
     char const   hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
     char         numtostrbuf[128];
+
+
+	// Added by Michael Haephrati
+
+	char filename[256];      // just name without path              (ASCII)
+	char projectname[256];   // project relationship from .pmr file (ASCII)
+	MDVxUUID filePackageUID; // file package UID - is a unique file identifier for each MXF or OMF file
+	MDVxUUID materialSourcePackageUID; // file package UID - is a unique "clip" identifier (bunch of files)
+
+	void getStringForUID(MDVxUUID* uid);
+	std::vector<MatchResult> GetStringsToVector(void);
+
     
 };
 #endif /* printer_hpp */

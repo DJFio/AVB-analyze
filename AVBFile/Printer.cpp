@@ -6,14 +6,17 @@
 //  Copyright © 2020 DJFio. All rights reserved.
 //
 
+// Handle Windows cases - Michael Haephrati
+// ----------------------------------------
 #ifdef _MSC_VER
 #include "vcProj/stdafx.h"
 #else
 #include <string>
 #include <vector>
 #endif
-#include "Printer.hpp"
+using namespace std;
 
+#include "Printer.hpp"
 
 //***********************************
 //   pretty print and dump
@@ -214,6 +217,41 @@ std::string  Printer::_hexlify_short_UID (MDVxUUID* uid)  {
 
 std::string  Printer::_fourcc_from_u32 (uint32_t fourcc){
     return std::string(reinterpret_cast<char*>(&fourcc),4);
+}
+
+vector<MatchResult> Printer::GetStringsToVector(void)
+{
+	vector<MatchResult> result;
+	MatchResult singleItem;
+
+	singleItem.FileName = filename;
+
+	singleItem.ProjectName = projectname;
+
+	getStringForUID(&filePackageUID);
+	singleItem.filepackageUID = printbuffer;
+
+	getStringForUID(&materialSourcePackageUID);
+	singleItem.SourcePackageUID = printbuffer;
+
+	result.push_back(singleItem);
+
+	return result;
+
+}
+void Printer::getStringForUID(MDVxUUID* uid)
+{
+
+	if (uid == NULL) return;
+	int c = 2;
+	for (int i = 0; i < 32; ++i)
+	{
+		printbuffer[c] = hex_chars[(uid->UMIDx[i] & 0xF0) >> 4];
+		printbuffer[c + 1] = hex_chars[(uid->UMIDx[i] & 0x0F) >> 0];
+		c += 2;
+		if (((i + 1) < 32) && ((i + 1) % 4 == 0)) c += 2;
+	}
+	return;
 }
 
 
