@@ -60,7 +60,6 @@ AVBFile::~AVBFile()
 
      avbfile.open( filename, std::ios::binary | std::ios::ate);
      if (!avbfile.good()){
-//         std::cout << "problem with AVB File :: bad file name? " << std::endl; redir_flush;
          return false;
      }
      bool result = theTOC.read(&avbfile);

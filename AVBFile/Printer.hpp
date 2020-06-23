@@ -13,7 +13,16 @@
 #include "MDVxUUID.hpp"
 #include "Decoder.hpp"
 
-
+//ignoring unknown stuff
+#ifdef _MSC_VER
+#ifdef ignore_this
+#undef ignore_this
+#endif
+#else
+#ifndef ignore_this
+#define ignore_this
+#endif
+#endif
 
 class Printer {
 public:
@@ -46,8 +55,10 @@ private:
 	MDVxUUID materialSourcePackageUID; // file package UID - is a unique "clip" identifier (bunch of files)
 
 	void getStringForUID(MDVxUUID* uid);
+    
+#ifndef ignore_this
 	std::vector<MatchResult> GetStringsToVector(void);
-
+#endif
     
 };
 #endif /* printer_hpp */

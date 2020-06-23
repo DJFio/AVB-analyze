@@ -218,7 +218,7 @@ std::string  Printer::_hexlify_short_UID (MDVxUUID* uid)  {
 std::string  Printer::_fourcc_from_u32 (uint32_t fourcc){
     return std::string(reinterpret_cast<char*>(&fourcc),4);
 }
-
+#ifndef ignore_this
 vector<MatchResult> Printer::GetStringsToVector(void)
 {
 	vector<MatchResult> result;
@@ -239,6 +239,8 @@ vector<MatchResult> Printer::GetStringsToVector(void)
 	return result;
 
 }
+#endif
+
 void Printer::getStringForUID(MDVxUUID* uid)
 {
 
