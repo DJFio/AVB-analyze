@@ -10,19 +10,11 @@
 
 #ifndef printer_hpp
 #define printer_hpp
+#include "setup.h"
 #include "MDVxUUID.hpp"
 #include "Decoder.hpp"
 
-//ignoring unknown stuff
-#ifdef _MSC_VER
-#ifdef ignore_this
-#undef ignore_this
-#endif
-#else
-#ifndef ignore_this
-#define ignore_this
-#endif
-#endif
+
 
 class Printer {
 public:
@@ -46,7 +38,7 @@ private:
     char const   hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
     char         numtostrbuf[128];
 
-
+#ifndef ignore_this
 	// Added by Michael Haephrati
 
 	char filename[256];      // just name without path              (ASCII)
@@ -56,7 +48,6 @@ private:
 
 	void getStringForUID(MDVxUUID* uid);
     
-#ifndef ignore_this
 	std::vector<MatchResult> GetStringsToVector(void);
 #endif
     

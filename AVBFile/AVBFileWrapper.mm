@@ -1,6 +1,6 @@
 //
 //  AVBFileWrapper.cpp
-//  Drag-Analyze-AVB
+//  AVB-analyze
 //
 //  Created by DJFio on 15/06/2020.
 //  Copyright © 2020 DJFio. All rights reserved.

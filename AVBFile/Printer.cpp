@@ -239,7 +239,6 @@ vector<MatchResult> Printer::GetStringsToVector(void)
 	return result;
 
 }
-#endif
 
 void Printer::getStringForUID(MDVxUUID* uid)
 {
@@ -256,6 +255,7 @@ void Printer::getStringForUID(MDVxUUID* uid)
 	return;
 }
 
+#endif
 
 //std::string
 

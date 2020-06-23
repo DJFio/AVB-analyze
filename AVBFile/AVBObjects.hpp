@@ -1,6 +1,6 @@
 //
 //  AVBObjects.hpp
-//  Drag-Analyze-AVB
+//  AVB-analyze
 //
 //  Created by DJFio on 18/06/2020.
 //  Copyright © 2020 DJFio. All rights reserved.
