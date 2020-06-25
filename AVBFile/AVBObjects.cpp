@@ -351,6 +351,27 @@ std::string atom_ABIN::dump(void){
 
 //TODO: ------------------* Components ---
 //TODO: --- COMP::Atom --- Component
+class    atom_COMP:public avbATOM
+{
+public:  atom_COMP(){ atom_fourcc = fourcc("COMP");}
+    bool read(std::ifstream *f);
+    std::string dump(void);
+};
+bool atom_COMP::read(std::ifstream *f){
+    if (avbATOM::BOB_read(f)==false) return false; // reading BOB
+    return true;
+}
+
+std::string atom_COMP::dump(void) {
+    std::stringstream log;
+    uint32_t position = 0x0;
+    uint32_t cp=0;cp++;
+
+    log  << BOB_begin_dump ();
+    log << BOB_end_dump() << std::endl;
+
+    return log.str();
+};
 //TODO: --- SEQU::COMP --- Sequence
 //TODO: --- CLIP::COMP --- Clip
 //TODO: --- SCLP::CLIP --- SourceClip
@@ -364,6 +385,27 @@ std::string atom_ABIN::dump(void){
 
 //TODO: ------------------* Track groups ---
 //TODO: --- TRKG::COMP --- TrackGroup
+class    atom_TRKG:public atom_COMP
+{
+public:  atom_TRKG(){ atom_fourcc = fourcc("TRKG");}
+    bool read(std::ifstream *f);
+    std::string dump(void);
+};
+bool atom_TRKG::read(std::ifstream *f){
+    if (atom_COMP::read(f)==false) return false; // reading BOB
+    return true;
+}
+
+std::string atom_TRKG::dump(void) {
+    std::stringstream log;
+    uint32_t position = 0x0;
+    uint32_t cp=0;cp++;
+
+    log  << BOB_begin_dump ();
+    log << BOB_end_dump() << std::endl;
+
+    return log.str();
+};
 //TODO: --- TKFX::TRKG --- TrackEffect
 //TODO: --- PVOL::TKFX --- PanVolumeEffect
 //TODO: --- ASPI::TKFX --- AudioSuitePluginEffect
@@ -377,7 +419,27 @@ std::string atom_ABIN::dump(void){
 //TODO: --- TNFX::TRKG --- TransitionEffect
 //TODO: --- SLCT::TRKG --- Selector
 //TODO: --- CMPO::TRKG --- Composition
+class    atom_CMPO:public atom_TRKG
+{
+public:  atom_CMPO(){ atom_fourcc = fourcc("CMPO");}
+    bool read(std::ifstream *f);
+    std::string dump(void);
+};
+bool atom_CMPO::read(std::ifstream *f){
+    if (atom_TRKG::read(f)==false) return false; // reading BOB
+    return true;
+}
 
+std::string atom_CMPO::dump(void) {
+    std::stringstream log;
+    uint32_t position = 0x0;
+    uint32_t cp=0;cp++;
+    
+    log  << BOB_begin_dump ();
+    log << BOB_end_dump() << std::endl;
+    
+    return log.str();
+};
 
 
 //TODO: ------------------*  Misc      ---
@@ -720,20 +782,19 @@ avbATOM *  avbTOC::pATOM_atTOC(uint32_t TOC_id){
 ATOMFactory::ATOMFactory()
 {
 
-    this -> Register<fourcc("ATOM"), avbATOM>();
-    this -> Register<fourcc("OBJD"), atom_OBJD>();
-    this -> Register<fourcc("ABIN"),atom_ABIN>(); //MCBin root object
-    this -> Register<fourcc("BINF"),atom_ABIN>(); //MCFirst root object
-    this -> Register<fourcc("FILE"),atom_FILE>(); //AMacFileLocator
-    this -> Register<fourcc("WINF"),atom_FILE>(); //AWinFileLocator
-    this -> Register<fourcc("ATTR"),atom_ATTR>(); //Attributes
+    this -> Register<fourcc("ATOM"),avbATOM>();
+    this -> Register<fourcc("OBJD"),atom_OBJD>();
+    this -> Register<fourcc("ABIN"),atom_ABIN>(); //ABIN root object
+    this -> Register<fourcc("BINF"),atom_ABIN>(); //BINF root object
+    this -> Register<fourcc("FILE"),atom_FILE>(); //FILE MacFileLocator
+    this -> Register<fourcc("WINF"),atom_FILE>(); //WINF WinFileLocator
+    this -> Register<fourcc("ATTR"),atom_ATTR>(); //ATTR Attributes
     this -> Register<fourcc("MSML"),atom_MSML>(); //MSMLocator
 
-    
-    
-    
-    //        this -> Register<fourcc("BINF"),atom_BINF>();
-    
+    this -> Register<fourcc("CMPO"),atom_CMPO>(); //CMPO Composition CMPO->TRKG->COMP->ATOM
+
+ 
+  
 //            this -> Register<fourcc("AIFC"),atom_AIFC>(); //AIFFDescriptor
     //        this -> Register<fourcc("ANCD"),atom_ANCD>();
     //        this -> Register<fourcc("ASPI"),atom_ASPI>();
@@ -741,7 +802,6 @@ ATOMFactory::ATOMFactory()
     //        this -> Register<fourcc("BVst"),atom_BVst>(); //ABinViewSetting
     //        this -> Register<fourcc("CCFX"),atom_CCFX>(); //Color correction FX
     //        this -> Register<fourcc("CDCI"),atom_CDCI>(); //CDCIDescriptor
-    //        this -> Register<fourcc("CMPO"),atom_CMPO>(); //AComposition
     //        this -> Register<fourcc("CTRL"),atom_CTRL>();
     //        this -> Register<fourcc("DIDP"),atom_DIDP>(); //DIDPosition
     //        this -> Register<fourcc("ECCP"),atom_ECCP>(); //AEdgecodeClip
