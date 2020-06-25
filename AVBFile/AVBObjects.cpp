@@ -570,7 +570,6 @@ std::string atom_MSML::dump(void) {
 //TODO: ------------------* Attributes ---
 //TODO: --- ATTR::Atom --- (Attributes)
 
-#endif
 class    atom_ATTR:public avbATOM
 {
 public:  atom_ATTR(){ atom_fourcc = fourcc("ATTR");attrCount=0;}
