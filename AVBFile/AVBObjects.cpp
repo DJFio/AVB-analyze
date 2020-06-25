@@ -30,16 +30,13 @@
 #endif	// redir_flush
 #endif	// _MSC_VER
 
-//*****************************************************************
+//-----------------------------------------------------------------
 //Base ATOM class
-//*****************************************************************
+//-----------------------------------------------------------------
 
 
-// Handle Windows cases - Michael Haephrati
-// ----------------------------------------
-#ifndef _MSC_VER
-#pragma mark *** ATOM::Atom base ***
-#endif
+
+//TODO: --- ATOM::Atom base ---
 
 avbATOM::avbATOM(): getvalue(&BOB){
     atom_fourcc = fourcc("ATOM");
@@ -118,11 +115,8 @@ std::string avbATOM::dump(void) {
     return log.str();
 };
 
-// Handle Windows cases - Michael Haephrati
-// ----------------------------------------
-#ifndef _MSC_VER
-#pragma mark *** OBJD::Atom ***
-#endif
+
+//TODO: --- OBJD::Atom ---
 
 class atom_OBJD: public avbATOM {
 public:
@@ -223,18 +217,15 @@ bool atom_OBJD::read(std::ifstream *f){
         return log.str();
     }
 
-// Handle Windows cases - Michael Haephrati
-// ----------------------------------------
-#ifndef _MSC_VER
 
-#pragma mark ******************* Bin ***
-#pragma mark *** ASET::Atom ***
-#pragma mark *** BVst::Atom ***
 
-#pragma mark *** ABIN::Atom ***
-#pragma mark *** BINF::Atom ***
+//TODO: ------------------* Bin ---
+//TODO: --- ASET::Atom ---
+//TODO: --- BVst::Atom ---
 
-#endif
+//TODO: --- ABIN::Atom ---
+//TODO: --- BINF::Atom ---
+
 
 class atom_ABIN: public avbATOM {
 public:
@@ -356,46 +347,43 @@ std::string atom_ABIN::dump(void){
     return log.str();
 }
 
-// Handle Windows cases - Michael Haephrati
-// ----------------------------------------
-#ifndef _MSC_VER
-
-#pragma mark ******************* Components ***
-#pragma mark *** COMP::Atom *** Component
-#pragma mark *** SEQU::COMP *** Sequence
-#pragma mark *** CLIP::COMP *** Clip
-#pragma mark *** SCLP::CLIP *** SourceClip
-#pragma mark *** TCCP::CLIP *** Timecode
-#pragma mark *** ECCP::CLIP *** Edgecode
-#pragma mark *** TRKR::CLIP *** TrackRef
-#pragma mark *** PRCL::CLIP *** ParamClip
-#pragma mark *** CTRL::CLIP *** ControlClip
-#pragma mark *** FILL::CLIP *** Filler
 
 
-#pragma mark ******************* Track groups ***
-#pragma mark *** TRKG::COMP *** TrackGroup
-#pragma mark *** TKFX::TRKG *** TrackEffect
-#pragma mark *** PVOL::TKFX *** PanVolumeEffect
-#pragma mark *** ASPI::TKFX *** AudioSuitePluginEffect
-#pragma mark *** EQMB::TKFX *** EqualizerMultiBand
-#pragma mark *** WARP::TRKG *** TimeWarp
-#pragma mark *** MASK::WARP *** CaptureMask
-#pragma mark *** STRB::WARP *** StrobeEffect
-#pragma mark *** SPED::WARP *** MotionEffect
-#pragma mark *** REPT::WARP *** Repeat
-#pragma mark *** RSET::TRKG *** EssenceGroup
-#pragma mark *** TNFX::TRKG *** TransitionEffect
-#pragma mark *** SLCT::TRKG *** Selector
-#pragma mark *** CMPO::TRKG *** Composition
+//TODO: ------------------* Components ---
+//TODO: --- COMP::Atom --- Component
+//TODO: --- SEQU::COMP --- Sequence
+//TODO: --- CLIP::COMP --- Clip
+//TODO: --- SCLP::CLIP --- SourceClip
+//TODO: --- TCCP::CLIP --- Timecode
+//TODO: --- ECCP::CLIP --- Edgecode
+//TODO: --- TRKR::CLIP --- TrackRef
+//TODO: --- PRCL::CLIP --- ParamClip
+//TODO: --- CTRL::CLIP --- ControlClip
+//TODO: --- FILL::CLIP --- Filler
+
+
+//TODO: ------------------* Track groups ---
+//TODO: --- TRKG::COMP --- TrackGroup
+//TODO: --- TKFX::TRKG --- TrackEffect
+//TODO: --- PVOL::TKFX --- PanVolumeEffect
+//TODO: --- ASPI::TKFX --- AudioSuitePluginEffect
+//TODO: --- EQMB::TKFX --- EqualizerMultiBand
+//TODO: --- WARP::TRKG --- TimeWarp
+//TODO: --- MASK::WARP --- CaptureMask
+//TODO: --- STRB::WARP --- StrobeEffect
+//TODO: --- SPED::WARP --- MotionEffect
+//TODO: --- REPT::WARP --- Repeat
+//TODO: --- RSET::TRKG --- EssenceGroup
+//TODO: --- TNFX::TRKG --- TransitionEffect
+//TODO: --- SLCT::TRKG --- Selector
+//TODO: --- CMPO::TRKG --- Composition
 
 
 
-#pragma mark *******************  Misc      ***
-#pragma mark *** FILE::Atom *** MacFileLocator
-#pragma mark *** WINF::Atom *** WinFileLocator
+//TODO: ------------------*  Misc      ---
+//TODO: --- FILE::Atom --- MacFileLocator
+//TODO: --- WINF::Atom --- WinFileLocator
 
-#endif
 
 class    atom_FILE:public avbATOM
 {
@@ -472,20 +460,17 @@ std::string atom_FILE::dump(void) {
     return log.str();
 };
 
-// Handle Windows cases - Michael Haephrati
-// ----------------------------------------
-#ifndef _MSC_VER
 
-#pragma mark *** URLL::Atom *** URLLocator
-#pragma mark *** GRFX::Atom *** GraphicEffect
-#pragma mark *** SHLP::Atom *** ShapeList
-#pragma mark *** CCFX::Atom *** ColorCorrectionEffect
-#pragma mark *** FXPS::Atom *** EffectParamList
-#pragma mark *** AVUP::Atom *** CFUserParam
-#pragma mark *** PRIT::Atom *** ParameterItems
-#pragma mark *** MSML::Atom *** MSMLocator
 
-#endif
+//TODO: --- URLL::Atom --- URLLocator
+//TODO: --- GRFX::Atom --- GraphicEffect
+//TODO: --- SHLP::Atom --- ShapeList
+//TODO: --- CCFX::Atom --- ColorCorrectionEffect
+//TODO: --- FXPS::Atom --- EffectParamList
+//TODO: --- AVUP::Atom --- CFUserParam
+//TODO: --- PRIT::Atom --- ParameterItems
+//TODO: --- MSML::Atom --- MSMLocator
+
 class    atom_MSML:public avbATOM
 {
 public:  atom_MSML(){ atom_fourcc = fourcc("FILE");}
@@ -547,45 +532,43 @@ std::string atom_MSML::dump(void) {
     
     return log.str();
 };
-// Handle Windows cases - Michael Haephrati
-// ----------------------------------------
-#ifndef _MSC_VER
-
-#pragma mark *** APOS::Atom ***
-#pragma mark *** ABOB::Atom ***
-#pragma mark *** DIDP::Atom ***
-#pragma mark *** MPGP::Atom ***
-#pragma mark *** MCBR::Atom ***
-#pragma mark *** MCMR::Atom ***
-#pragma mark *** TMBC::Atom *** (Marker)
-#pragma mark *** TKMN::Atom ***
-#pragma mark *** TKDS::Atom ***
-#pragma mark *** TKPS::Atom ***
-#pragma mark *** TKDA::Atom ***
-#pragma mark *** TKPA::Atom ***
 
 
-#pragma mark *******************  Essence   ***
-#pragma mark *** MDES::Atom ***
-#pragma mark *** mdes::Atom ***
-#pragma mark *** MDTP::Atom ***
-#pragma mark *** MDFM::Atom ***
-#pragma mark *** MDNG::Atom ***
-#pragma mark *** MDFL::Atom ***
-#pragma mark *** MULD::Atom ***
-#pragma mark *** WAVE::Atom ***
-#pragma mark *** AIFC::Atom ***
-#pragma mark *** PCMA::Atom ***
-#pragma mark *** DIDD::Atom ***
-#pragma mark *** CDCI::Atom ***
-#pragma mark *** MPGI::Atom ***
-#pragma mark *** JPED::Atom ***
-#pragma mark *** RGBA::Atom ***
+//TODO: --- APOS::Atom ---
+//TODO: --- ABOB::Atom ---
+//TODO: --- DIDP::Atom ---
+//TODO: --- MPGP::Atom ---
+//TODO: --- MCBR::Atom ---
+//TODO: --- MCMR::Atom ---
+//TODO: --- TMBC::Atom --- (Marker)
+//TODO: --- TKMN::Atom ---
+//TODO: --- TKDS::Atom ---
+//TODO: --- TKPS::Atom ---
+//TODO: --- TKDA::Atom ---
+//TODO: --- TKPA::Atom ---
+
+
+//TODO: ------------------*  Essence   ---
+//TODO: --- MDES::Atom ---
+//TODO: --- mdes::Atom ---
+//TODO: --- MDTP::Atom ---
+//TODO: --- MDFM::Atom ---
+//TODO: --- MDNG::Atom ---
+//TODO: --- MDFL::Atom ---
+//TODO: --- MULD::Atom ---
+//TODO: --- WAVE::Atom ---
+//TODO: --- AIFC::Atom ---
+//TODO: --- PCMA::Atom ---
+//TODO: --- DIDD::Atom ---
+//TODO: --- CDCI::Atom ---
+//TODO: --- MPGI::Atom ---
+//TODO: --- JPED::Atom ---
+//TODO: --- RGBA::Atom ---
 
 
 
-#pragma mark ******************* Attributes ***
-#pragma mark *** ATTR::Atom *** (Attributes)
+//TODO: ------------------* Attributes ---
+//TODO: --- ATTR::Atom --- (Attributes)
 
 #endif
 class    atom_ATTR:public avbATOM
@@ -659,21 +642,19 @@ std::string atom_ATTR::dump(void) {
     return log.str();
 };
 
-// Handle Windows cases - Michael Haephrati
-// ----------------------------------------
-#ifndef _MSC_VER
-#pragma mark *** PRLS::Atom *** (Parameter list)
-#pragma mark *** TMCS::Atom *** (Marker List)
 
-#pragma mark ******************* Uknown ***
-#pragma mark *** ANCD::Atom ***
-#pragma mark *** Iprj::Atom ***
-#pragma mark *** RLED::Atom ***
-#pragma mark *** SETG::Atom ***
-#pragma mark *** SLPI::Atom ***
+//TODO: --- PRLS::Atom --- (Parameter list)
+//TODO: --- TMCS::Atom --- (Marker List)
 
-#endif
-//*****************************************************************
+//TODO: ------------------* Uknown ---
+//TODO: --- ANCD::Atom ---
+//TODO: --- Iprj::Atom ---
+//TODO: --- RLED::Atom ---
+//TODO: --- SETG::Atom ---
+//TODO: --- SLPI::Atom ---
+
+
+//-----------------------------------------------------------------
 //TODO:class prototype
 //class    atom_FILE:public avbATOM
 //{
@@ -698,13 +679,9 @@ std::string atom_ATTR::dump(void) {
 //    return log.str();
 //};
 
-// Handle Windows cases - Michael Haephrati
-// ----------------------------------------
-#ifndef _MSC_VER
-#pragma mark *** avbTOC::Methods ***
-#endif
 
-//*****************************************************************
+//TODO: --- avbTOC::Methods ---
+//-----------------------------------------------------------------
 
 bool avbTOC::read(std::ifstream * f){
     next_TOCid = 0;
@@ -738,7 +715,7 @@ avbATOM *  avbTOC::pATOM_atTOC(uint32_t TOC_id){
 };
 
 
-//*****************************************************************
+//-----------------------------------------------------------------
 //TODO: add more types to ATOMFactory
 
 ATOMFactory::ATOMFactory()
