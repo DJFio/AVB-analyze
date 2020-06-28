@@ -72,6 +72,12 @@ uint8_t      Decoder::_u8 (void)
     cp++;
     return val;
 }
+uint32_t     Decoder::_objref(void)
+{
+    uint32_t  val = Byte_Cast32 (*reinterpret_cast<uint32_t*>(pBytes->data()+cp),usebyteswap);
+    cp+=4;
+    return val;
+}
 uint32_t Decoder::cvt32(uint32_t val)
 {
     return  Byte_Cast32 (val,usebyteswap);
@@ -94,7 +100,10 @@ uint8_t Decoder::getnext_typetag(void){
 std::string  Decoder::_string (void)
 {
     uint16_t strsz = this->_u16();
-    
+    if (strsz == 0xFFFF) {
+        return std::string("[none]");
+        
+    }
     if (strsz > bytes_left()) {
         assert(false);
         cp-=2;
@@ -207,6 +216,7 @@ void  Decoder::readUID        (MDVxUUID * uid){
     uid->UMIDx[31]=this->_u8();
 }
 void  Decoder::readMobID      (MDVxUUID * uid){
+    
     readSMPTELabel (uid);
     this->_u8_assert(68);
     uid->UMIDx[12]=this->_u8();

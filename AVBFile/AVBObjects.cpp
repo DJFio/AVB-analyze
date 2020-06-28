@@ -47,10 +47,11 @@ avbATOM::avbATOM(): getvalue(&BOB){
     BOB[2]=0x3; //std end
     hasReferencesToOtherOBJs=0L;
 }
+
 void avbATOM::init(avbTOC *pParentTOC){
     pTOC = pParentTOC;
     getvalue.set_bswap(pParentTOC->getByteswap());
-    referenceCount = 1;
+    referenceCount = 1;//referenced by parent
 }
 bool avbATOM::BOB_read(std::ifstream *f){
     hasReferencesToOtherOBJs=0L;
@@ -62,9 +63,15 @@ bool avbATOM::BOB_read(std::ifstream *f){
     f->read(BOB.data(),length);
     getvalue.set_pos(0L);
     assert ((BOB[0]==0x02)&&(BOB[length-1]==0x03));
-    if ((BOB[0]==0x02)&&(BOB[length-1]==0x03)) return true;
-    return false;
+    if ((BOB[0]==0x02)&&(BOB[length-1]==0x03)) BOBisValid = true;
+    else BOBisValid = false;
+    return BOBisValid;
 }
+bool avbATOM::create_object_from_BOB(){
+    OBJisValid = BOBisValid;
+    return OBJisValid;
+}
+
 std::string avbATOM::BOB_end_dump(void){
     std::stringstream log("");
     Printer p(&getvalue);
@@ -92,9 +99,6 @@ std::string avbATOM::BOB_begin_dump(uint32_t pos){
     
 }
 
-bool avbATOM::read(std::ifstream *f){
-    return BOB_read(f);
-}
 bool avbATOM::write(std::ofstream *f){
     if (BOB.size()<3) return false;
     assert ((BOB[0]==0x02)&&(BOB[length-1]==0x03));
@@ -106,6 +110,8 @@ bool avbATOM::write(std::ofstream *f){
     return true;
 }
 std::string avbATOM::dump(void) {
+    if (OBJisValid==false) return dumpInvalidObject();
+
     std::stringstream log;
     Printer p(&getvalue);
     log << BOB_begin_dump();
@@ -114,6 +120,29 @@ std::string avbATOM::dump(void) {
 
     return log.str();
 };
+std::string avbATOM::dumpInvalidObject(void){
+    std::stringstream log;
+    Printer p(&getvalue);
+    log << BOB_begin_dump();
+    log  <<"  |-invalid_OBJECT:" << std::endl;;
+
+    uint32_t bytesleft = getvalue.bytes_left();
+    if(bytesleft != 0){
+        log  <<"#::unknown data :: |len: 0x"<< p._hexlify_u32(bytesleft) << std::endl;
+        if (bytesleft<32) {log  <<"  |=>"<< p._dump(getvalue.get_pos(), bytesleft) << std::endl;} else
+        {log  << p._pretty_dump(getvalue.get_pos(), bytesleft) << std::endl;}
+    }
+    return log.str();
+}
+
+uint32_t avbATOM::read_objref(){
+    uint32_t pObj = getvalue._objref();
+    if (pObj != 0){
+        hasReferencesToOtherOBJs++;
+        pTOC->at(pObj)->referenceCount++;
+    }
+    return pObj;
+}
 
 
 //TODO: --- OBJD::Atom ---
@@ -131,19 +160,20 @@ public:
     uint32_t TOCObjCount;
     uint32_t TOCRootObject;
     MDVxUUID BINUID;
-    bool read(std::ifstream *f);
+    bool BOB_read(std::ifstream *f);
     std::string dump(void);
 
 };
 
-bool atom_OBJD::read(std::ifstream *f){
+bool atom_OBJD::BOB_read(std::ifstream *f){
+    BOBisValid = false;
     std::streamsize avbsize =f->tellg();
     f->seekg(0, std::ios::beg);
     assert (avbsize > 0x77);
     if (avbsize < 0x77) // the header entry in avb file is 0x77 bytes long
     {
 //        std::cout << "problem with AVB File :: too small " << std::endl; redir_flush;
-        return false;
+        return BOBisValid;
 
     }
     
@@ -157,7 +187,7 @@ bool atom_OBJD::read(std::ifstream *f){
         if (memcmp (&BOB.data()[2],avbmagic,10)!=0)
         {
             //                std::cout << "problem with AVB File :: Bad Magic bytes" << std::endl; redir_flush;
-            return false;
+            return BOBisValid;
         }
         
         TOC_id = 0x0; //the OBJD  object
@@ -175,7 +205,7 @@ bool atom_OBJD::read(std::ifstream *f){
 
         TOCObjCount = getvalue._u32();//tocobj count
         pTOC->resizeTOC(TOCObjCount); //taking OBJD in account
-        TOCRootObject = getvalue._u32();//tocrootobject
+        TOCRootObject = getvalue._objref();//tocrootobject
         hasReferencesToOtherOBJs++;
         pTOC->setRootObject(TOCRootObject);
         getvalue._fourcc_u32();    //IIII
@@ -186,18 +216,19 @@ bool atom_OBJD::read(std::ifstream *f){
         getvalue.pos_advance(16);  //[zeroes]
         
         assert( getvalue.get_pos()==0x77);
-        if ( getvalue.get_pos()==0x77) return true;
+        if ( getvalue.get_pos()==0x77) BOBisValid=  true;
         
     }
-    
-    return false;
+    return avbATOM::create_object_from_BOB();
 
 }
     std::string atom_OBJD::dump(void)
     {
+        if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+
         std::stringstream log;
         Printer p(&getvalue);
-
+        
         log  << BOB_begin_dump ();
         getvalue._string(); // Domain
         log <<"-"<< getvalue._fourcc() << std::endl;//ATOM OBJD
@@ -205,7 +236,7 @@ bool atom_OBJD::read(std::ifstream *f){
         log <<"  |-02:domain version=4: "<< p._hexlify_u8(getvalue._u8()) << std::endl; //version
         log <<"  |-03:lastsave        : "<< getvalue._string()<< std::endl; //string:date
         log <<"  |-04:numobj          : "<< p._hexlify_u32(getvalue._u32())<< std::endl;//tocobj count
-        log <<"  |-05:rootobj:selfroot: "<< p._hexlify_u32(getvalue._u32())<< std::endl;//tocrootobject
+        log <<"  |-05:rootobj:selfroot: "<< p._hexlify_u32(getvalue._objref())<< std::endl;//tocrootobject
         log <<"  |-06:order           : "<< getvalue._fourcc()<< std::endl;   //IIII
         log <<"  |-07:UID hi::lo      : "<< p._hexlify_short_UID(&BINUID)<< std::endl;    getvalue.pos_advance(8);
         log <<"  |-08:fourcc:filetype : "<< getvalue._fourcc()<< std::endl;  //filetype
@@ -232,7 +263,7 @@ public:
     atom_ABIN(){
         atom_fourcc = fourcc("ABIN");
     }
-    bool read(std::ifstream *f);
+    bool create_object_from_BOB();
     std::string dump(void);
 
     bool largebin = false;
@@ -243,24 +274,22 @@ public:
 
 };
 
-bool atom_ABIN::read(std::ifstream *f){
-    if (avbATOM::BOB_read(f)==false) return false; // reading BOB
+bool atom_ABIN::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
+
     getvalue.set_pos(0x0L);
     
     getvalue._u8_assert(0x2);//tag
 
     largebin  = (getvalue._u8()==0xf);
-    BVst_id = getvalue._u32();
-    hasReferencesToOtherOBJs++;
-    pTOC->pATOM_atTOC(BVst_id)->referenceCount++;
+    BVst_id = read_objref();
     rootObjUID.makeFrom2(BOB.data()+getvalue.get_pos()); getvalue.pos_advance(8);
     if (!largebin){ CMPOcount = static_cast<uint32_t> (getvalue._u16());}
     else { CMPOcount = static_cast<uint32_t> (getvalue._u32());}
-    hasReferencesToOtherOBJs+=CMPOcount;
     for (uint32_t i = 0 ; i<CMPOcount;i++){
-        uint32_t pObj = getvalue._u32();
+        read_objref();
         getvalue.pos_advance(9);
-        pTOC->pATOM_atTOC(pObj)->referenceCount++;
     }
     getvalue.pos_advance(7);
     for (uint32_t i = 0 ; i<6;i++){
@@ -274,12 +303,15 @@ bool atom_ABIN::read(std::ifstream *f){
         getvalue.pos_advance(getvalue._u16());
     }
     getvalue.pos_advance(34);
-    ATTR_id = getvalue._u32();
-    pTOC->pATOM_atTOC(ATTR_id)->referenceCount++;
+    ATTR_id = read_objref();
     getvalue.pos_advance(1);
-    return true;
+    
+    OBJisValid = BOBisValid;
+    return OBJisValid;
 }
 std::string atom_ABIN::dump(void){
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+
     std::stringstream log;
     Printer p(&getvalue);
     
@@ -292,7 +324,7 @@ std::string atom_ABIN::dump(void){
     log  <<"  |-UID64: "<<p._hexlify_short_UID(&rootObjUID) << std::endl;getvalue.pos_advance(8);
     log  <<"  |-CMPOItems: "<<p._hexlify_u32(CMPOcount) << std::endl; if (!largebin){ getvalue.pos_advance(2); } else { getvalue.pos_advance(4);}
     for (uint32_t i = 0 ; i<CMPOcount;i++){
-        uint32_t pObj = getvalue._u32();
+        uint32_t pObj = getvalue._objref();
         log  <<"  |-CMPOref# "<<i<<"|TOC=" <<p._hexlify_u32(pObj);
         log  <<"|X=" <<p._hexlify_u16(getvalue._u16());
         log  <<"|Y=" <<p._hexlify_u16(getvalue._u16());
@@ -339,7 +371,7 @@ std::string atom_ABIN::dump(void){
 
     //BINF
     if (atom_fourcc==fourcc("BINF")){
-        log  <<"  |-(BINF unknown 02 01 + TOC):"<<p._hexlify_u16(getvalue._u16())<<"|" <<p._hexlify_u32(getvalue._u32())<< "|=>OBJ'" << std::endl;
+        log  <<"  |-(BINF unknown 02 01 + [obj]):"<<p._hexlify_u16(getvalue._u16())<<"|" <<p._hexlify_u32(getvalue._objref())<< "|=>OBJ'" << std::endl;
     }
 
     log << BOB_end_dump() << std::endl;
@@ -354,33 +386,341 @@ std::string atom_ABIN::dump(void){
 class    atom_COMP:public avbATOM
 {
 public:  atom_COMP(){ atom_fourcc = fourcc("COMP");}
-    bool read(std::ifstream *f);
+    bool create_object_from_BOB();
     std::string dump(void);
 };
-bool atom_COMP::read(std::ifstream *f){
-    if (avbATOM::BOB_read(f)==false) return false; // reading BOB
-    return true;
+bool atom_COMP::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
+    
+    getvalue._u8_assert(0x02);
+    getvalue._u8_assert(0x03);
+    read_objref();;//left.bob
+    read_objref();;//right.bob
+    getvalue._u16();//self.mediakind
+    getvalue._u32();//editrate.mantissa
+    getvalue._u16();//editrate.exp10  editrate=float(mantissa) * pow(10, exp10)
+    getvalue._string();//name
+    getvalue._string();//effect.id
+    read_objref();//self.attributes
+    read_objref();//self.session attrs
+    read_objref();//self.precomputed
+    while (uint8_t it = getvalue.getnext_typetag()){
+        switch (it){
+            case 0x01:
+                getvalue._u8_assert(0x48);
+                read_objref();//self.paramlist
+                break;
+            default:
+                assert(false); //unknown tag
+                break;
+        }
+    }
+
+    OBJisValid = BOBisValid;
+    return OBJisValid;
 }
 
 std::string atom_COMP::dump(void) {
-    std::stringstream log;
-    uint32_t position = 0x0;
-    uint32_t cp=0;cp++;
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
 
+    std::stringstream log;
+    Printer p(&getvalue);
+    getvalue.set_pos(0L);
+    
     log  << BOB_begin_dump ();
-    log << BOB_end_dump() << std::endl;
+    
+    
+    getvalue._u8_assert(0x02);
+    getvalue._u8_assert(0x03);
+    
+    log <<"  |-left.bob[obj]: " << p._hexlify_u32(getvalue._objref()) << std::endl;//left.bob
+    log <<"  |-right.bob[obj]: " << p._hexlify_u32(getvalue._objref()) << std::endl;//right.bob
+    log <<"  |-mediakind: " << p._hexlify_u16(getvalue._u16()) << std::endl;//self.mediakind
+    log <<"  |-edit rate: " << getvalue._u32() << "/(10^"<< getvalue._s16() << ")" << std::endl;// editrate=float(mantissa) * pow(10, exp10)
+    log <<"  |-name: " << getvalue._string() << std::endl;//name
+    log <<"  |-effectid: " << getvalue._string()<< std::endl;//effect.id
+    log <<"  |-Self.attr[obj]: " << p._hexlify_u32(getvalue._objref())<< std::endl;//self.attributes
+    log <<"  |-Session.attr[obj]: " << p._hexlify_u32(getvalue._objref())<< std::endl;//self.session attrs
+    log <<"  |-precomputed[obj]: " << p._hexlify_u32(getvalue._objref())<< std::endl;//self.precomputed
+    while (uint8_t it = getvalue.getnext_typetag()){
+        switch (it){
+            case 0x01:
+                getvalue._u8_assert(0x48);
+                log <<"  |-param: " << p._hexlify_u32(getvalue._objref())<< std::endl;//self.paramlist
+                break;
+            default:
+                assert(false); //unknown tag
+                break;
+        }
+    }
+    
+    
+    if (atom_fourcc == fourcc("COMP")) {log << BOB_end_dump() << std::endl;}
 
     return log.str();
 };
 //TODO: --- SEQU::COMP --- Sequence
+class    atom_SEQU:public atom_COMP
+{
+public:  atom_SEQU(){ atom_fourcc = fourcc("SEQU");}
+    bool create_object_from_BOB();
+    std::string dump(void);
+};
+bool atom_SEQU::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
+    if (atom_COMP::create_object_from_BOB()==false) return false;
+    
+    OBJisValid = BOBisValid;
+    return OBJisValid;
+}
+
+std::string atom_SEQU::dump(void) {
+    
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+    
+    std::stringstream log;
+    log << atom_COMP::dump();
+    
+    Printer p(&getvalue);
+    
+    if (atom_fourcc == fourcc("SEQU")) {log << BOB_end_dump() << std::endl;}
+    
+    return log.str();
+};
 //TODO: --- CLIP::COMP --- Clip
+class    atom_CLIP:public atom_COMP
+{
+public:  atom_CLIP(){ atom_fourcc = fourcc("CLIP");}
+    bool create_object_from_BOB();
+    std::string dump(void);
+};
+bool atom_CLIP::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
+    if (atom_COMP::create_object_from_BOB()==false) return false;
+    
+    OBJisValid = BOBisValid;
+    return OBJisValid;
+}
+
+std::string atom_CLIP::dump(void) {
+    
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+    
+    std::stringstream log;
+    log << atom_COMP::dump();
+    
+    Printer p(&getvalue);
+    
+    if (atom_fourcc == fourcc("CLIP")) {log << BOB_end_dump() << std::endl;}
+    
+    return log.str();
+};
 //TODO: --- SCLP::CLIP --- SourceClip
+class    atom_SCLP:public atom_CLIP
+{
+public:  atom_SCLP(){ atom_fourcc = fourcc("SCLP");}
+    bool create_object_from_BOB();
+    std::string dump(void);
+};
+bool atom_SCLP::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
+    if (atom_CLIP::create_object_from_BOB()==false) return false;
+    
+    OBJisValid = BOBisValid;
+    return OBJisValid;
+}
+
+std::string atom_SCLP::dump(void) {
+    
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+    
+    std::stringstream log;
+    log << atom_CLIP::dump();
+    
+    Printer p(&getvalue);
+    
+    if (atom_fourcc == fourcc("SCLP")) {log << BOB_end_dump() << std::endl;}
+    
+    return log.str();
+};
 //TODO: --- TCCP::CLIP --- Timecode
+class    atom_TCCP:public atom_CLIP
+{
+public:  atom_TCCP(){ atom_fourcc = fourcc("TCCP");}
+    bool create_object_from_BOB();
+    std::string dump(void);
+};
+bool atom_TCCP::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
+    if (atom_CLIP::create_object_from_BOB()==false) return false;
+    
+    OBJisValid = BOBisValid;
+    return OBJisValid;
+}
+
+std::string atom_TCCP::dump(void) {
+    
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+    
+    std::stringstream log;
+    log << atom_CLIP::dump();
+    
+    Printer p(&getvalue);
+    
+    if (atom_fourcc == fourcc("TCCP")) {log << BOB_end_dump() << std::endl;}
+    
+    return log.str();
+};
 //TODO: --- ECCP::CLIP --- Edgecode
+class    atom_ECCP:public atom_CLIP
+{
+public:  atom_ECCP(){ atom_fourcc = fourcc("ECCP");}
+    bool create_object_from_BOB();
+    std::string dump(void);
+};
+bool atom_ECCP::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
+    if (atom_CLIP::create_object_from_BOB()==false) return false;
+    
+    OBJisValid = BOBisValid;
+    return OBJisValid;
+}
+
+std::string atom_ECCP::dump(void) {
+    
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+    
+    std::stringstream log;
+    log << atom_CLIP::dump();
+    
+    Printer p(&getvalue);
+    
+    if (atom_fourcc == fourcc("ECCP")) {log << BOB_end_dump() << std::endl;}
+    
+    return log.str();
+};
 //TODO: --- TRKR::CLIP --- TrackRef
+class    atom_TRKR:public atom_CLIP
+{
+public:  atom_TRKR(){ atom_fourcc = fourcc("TRKR");}
+    bool create_object_from_BOB();
+    std::string dump(void);
+};
+bool atom_TRKR::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
+    if (atom_CLIP::create_object_from_BOB()==false) return false;
+    
+    OBJisValid = BOBisValid;
+    return OBJisValid;
+}
+
+std::string atom_TRKR::dump(void) {
+    
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+    
+    std::stringstream log;
+    log << atom_CLIP::dump();
+    
+    Printer p(&getvalue);
+    
+    if (atom_fourcc == fourcc("TRKR")) {log << BOB_end_dump() << std::endl;}
+    
+    return log.str();
+};
 //TODO: --- PRCL::CLIP --- ParamClip
+class    atom_PRCL:public atom_CLIP
+{
+public:  atom_PRCL(){ atom_fourcc = fourcc("PRCL");}
+    bool create_object_from_BOB();
+    std::string dump(void);
+};
+bool atom_PRCL::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
+    if (atom_CLIP::create_object_from_BOB()==false) return false;
+    
+    OBJisValid = BOBisValid;
+    return OBJisValid;
+}
+
+std::string atom_PRCL::dump(void) {
+    
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+    
+    std::stringstream log;
+    log << atom_CLIP::dump();
+    
+    Printer p(&getvalue);
+    
+    if (atom_fourcc == fourcc("PRCL")) {log << BOB_end_dump() << std::endl;}
+    
+    return log.str();
+};
 //TODO: --- CTRL::CLIP --- ControlClip
+class    atom_CTRL:public atom_CLIP
+{
+public:  atom_CTRL(){ atom_fourcc = fourcc("CTRL");}
+    bool create_object_from_BOB();
+    std::string dump(void);
+};
+bool atom_CTRL::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
+    if (atom_CLIP::create_object_from_BOB()==false) return false;
+    
+    OBJisValid = BOBisValid;
+    return OBJisValid;
+}
+
+std::string atom_CTRL::dump(void) {
+    
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+    
+    std::stringstream log;
+    log << atom_CLIP::dump();
+    
+    Printer p(&getvalue);
+    
+    if (atom_fourcc == fourcc("CTRL")) {log << BOB_end_dump() << std::endl;}
+    
+    return log.str();
+};
 //TODO: --- FILL::CLIP --- Filler
+class    atom_FILL:public atom_CLIP
+{
+public:  atom_FILL(){ atom_fourcc = fourcc("FILL");}
+    bool create_object_from_BOB();
+    std::string dump(void);
+};
+bool atom_FILL::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
+    if (atom_CLIP::create_object_from_BOB()==false) return false;
+    
+    OBJisValid = BOBisValid;
+    return OBJisValid;
+}
+
+std::string atom_FILL::dump(void) {
+    
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+    
+    std::stringstream log;
+    log << atom_CLIP::dump();
+    
+    Printer p(&getvalue);
+    
+    if (atom_fourcc == fourcc("FILL")) {log << BOB_end_dump() << std::endl;}
+    
+    return log.str();
+};
 
 
 //TODO: ------------------* Track groups ---
@@ -388,27 +728,266 @@ std::string atom_COMP::dump(void) {
 class    atom_TRKG:public atom_COMP
 {
 public:  atom_TRKG(){ atom_fourcc = fourcc("TRKG");}
-    bool read(std::ifstream *f);
+    bool create_object_from_BOB();
     std::string dump(void);
 };
-bool atom_TRKG::read(std::ifstream *f){
-    if (atom_COMP::read(f)==false) return false; // reading BOB
-    return true;
+bool atom_TRKG::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
+    if (atom_COMP::create_object_from_BOB()==false) return false;
+ 
+    getvalue._u8_assert(0x02);
+    getvalue._u8_assert(0x08);
+    getvalue._u8();//mc_mode
+    getvalue._u32();//length
+    getvalue._u32();//numscalars
+    uint32_t trCount = getvalue._u32();//trackcount
+    for (int i=0;i<trCount;i++){
+        uint16_t flags = getvalue._u16();//flags for track
+        
+        if (flags & TRACK_LABEL_FLAG)
+            getvalue._s16();
+        
+        else if (flags & TRACK_ATTRIBUTES_FLAG)
+            read_objref();
+        
+        if (flags & TRACK_SESSION_ATTR_FLAG)
+             read_objref();
+        
+        if (flags & TRACK_COMPONENT_FLAG)
+             read_objref();
+        
+        if (flags & TRACK_FILLER_PROXY_FLAG)
+             read_objref();
+        
+        if (flags & TRACK_BOB_DATA_FLAG)
+             read_objref();
+        
+        if (flags & TRACK_CONTROL_CODE_FLAG)
+            getvalue._s16();
+
+        if (flags & TRACK_CONTROL_SUB_CODE_FLAG)
+            getvalue._s16();
+
+        if (flags & TRACK_START_POS_FLAG)
+            getvalue._s32();
+
+        if (flags & TRACK_READ_ONLY_FLAG)
+            getvalue._u8();
+
+        if (flags & TRACK_UNKNOWN_FLAGS)
+            assert(false);//("Unknown Track Flag: %d" % flags);
+        
+    }
+    while (uint8_t it = getvalue.getnext_typetag() ){
+        switch (it){
+            case 0x01:
+                for (int i=0;i<trCount;i++)
+                {
+                    getvalue._u8_assert(0x45);
+                    getvalue._s16();//locknumber
+                }
+                break;
+            default:
+                assert(false);
+                break;
+        }
+    }
+
+    return OBJisValid;
 }
 
 std::string atom_TRKG::dump(void) {
-    std::stringstream log;
-    uint32_t position = 0x0;
-    uint32_t cp=0;cp++;
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
 
-    log  << BOB_begin_dump ();
-    log << BOB_end_dump() << std::endl;
+    std::stringstream log;
+    log << atom_COMP::dump();
+
+    Printer p(&getvalue);
+
+    getvalue._u8_assert(0x02);
+    getvalue._u8_assert(0x08);
+
+    
+    log <<"  |--------"<< std::endl;//left.bob
+    log <<"  |-mcmode: " << p._hexlify_u8(getvalue._u8())<< std::endl;//mc_mode
+    log <<"  |-length: " << getvalue._u32()<< std::endl;//length
+    log <<"  |-numscalars: " << getvalue._u32()<< std::endl;//numscalars
+    uint32_t trCount = getvalue._u32();//trackcount
+    log <<"  |-track count: " << p._hexlify_u32(trCount) << std::endl;
+    
+    for (int i=0;i<trCount;i++){
+        uint16_t flags = getvalue._u16();//flags for track
+        log <<"  |-track["<< i <<"] flags: " << p._hexlify_u16(flags) ;
+
+        if (flags & TRACK_LABEL_FLAG)
+        {
+            log <<"|label: " <<  p._hexlify_u16(getvalue._s16());
+        }
+        
+        else if (flags & TRACK_ATTRIBUTES_FLAG)
+        {
+             log <<"|track_attr[obj]: " <<p._hexlify_u32(getvalue._objref());
+        }
+        
+        if (flags & TRACK_SESSION_ATTR_FLAG)
+        {
+            log <<"|session_attr[obj]: " <<p._hexlify_u32(getvalue._objref());
+        }
+        
+        if (flags & TRACK_COMPONENT_FLAG)
+        {
+             log <<"|comp[obj]: " <<p._hexlify_u32(getvalue._objref());
+        }
+        
+        if (flags & TRACK_FILLER_PROXY_FLAG)
+        {
+             log <<"|filler_proxy[obj]: " <<p._hexlify_u32(getvalue._objref());
+        }
+        
+        if (flags & TRACK_BOB_DATA_FLAG)
+        {
+            log <<"|bob_data[obj]: " <<p._hexlify_u32(getvalue._objref());
+        }
+        
+        if (flags & TRACK_CONTROL_CODE_FLAG)
+        {
+            log <<"|control code: " << p._hexlify_u16(getvalue._s16());
+        }
+        
+        if (flags & TRACK_CONTROL_SUB_CODE_FLAG)
+        {
+            log <<"|control sub code: " <<  p._hexlify_u16(getvalue._s16());
+        }
+        
+        if (flags & TRACK_START_POS_FLAG)
+        {
+            log <<"|start pos: " << p._hexlify_u32(getvalue._s32());
+        }
+        
+        if (flags & TRACK_READ_ONLY_FLAG)
+        {
+            log <<"|read only: " << p._hexlify_u8(getvalue._u8());
+        }
+        
+        if (flags & TRACK_UNKNOWN_FLAGS)
+            assert(false);//("Unknown Track Flag: %d" % flags);
+        
+        log << std::endl;
+        
+    }
+    while (uint8_t it = getvalue.getnext_typetag() ){
+        switch (it){
+            case 0x01:
+            {
+                for (int i=0;i<trCount;i++)
+                {
+                    getvalue._u8_assert(0x45);
+                    log <<"  |locknumber: " << p._hexlify_u16(getvalue._s16()) << std::endl;//locknumber
+                }
+            }
+                break;
+            default:
+                assert(false);
+                break;
+        }
+    }
+
+    
+    
+    
+    
+    if (atom_fourcc == fourcc("TRKG")) {log << BOB_end_dump() << std::endl;}
 
     return log.str();
 };
 //TODO: --- TKFX::TRKG --- TrackEffect
+class    atom_TKFX:public atom_TRKG
+{
+public:  atom_TKFX(){ atom_fourcc = fourcc("TKFX");}
+    bool create_object_from_BOB();
+    std::string dump(void);
+};
+bool atom_TKFX::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
+    if (atom_TRKG::create_object_from_BOB()==false) return false;
+    
+    OBJisValid = BOBisValid;
+    return OBJisValid;
+}
+
+std::string atom_TKFX::dump(void) {
+    
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+    
+    std::stringstream log;
+    log << atom_TRKG::dump();
+    
+    Printer p(&getvalue);
+    
+    if (atom_fourcc == fourcc("TKFX")) {log << BOB_end_dump() << std::endl;}
+    
+    return log.str();
+};
 //TODO: --- PVOL::TKFX --- PanVolumeEffect
+class    atom_PVOL:public atom_TKFX
+{
+public:  atom_PVOL(){ atom_fourcc = fourcc("PVOL");}
+    bool create_object_from_BOB();
+    std::string dump(void);
+};
+bool atom_PVOL::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
+    if (atom_TKFX::create_object_from_BOB()==false) return false;
+    
+    OBJisValid = BOBisValid;
+    return OBJisValid;
+}
+
+std::string atom_PVOL::dump(void) {
+    
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+    
+    std::stringstream log;
+    log << atom_TKFX::dump();
+    
+    Printer p(&getvalue);
+    
+    if (atom_fourcc == fourcc("PVOL")) {log << BOB_end_dump() << std::endl;}
+    
+    return log.str();
+};
 //TODO: --- ASPI::TKFX --- AudioSuitePluginEffect
+class    atom_ASPI:public atom_TKFX
+{
+public:  atom_ASPI(){ atom_fourcc = fourcc("ASPI");}
+    bool create_object_from_BOB();
+    std::string dump(void);
+};
+bool atom_ASPI::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
+    if (atom_TKFX::create_object_from_BOB()==false) return false;
+    
+    OBJisValid = BOBisValid;
+    return OBJisValid;
+}
+
+std::string atom_ASPI::dump(void) {
+    
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+    
+    std::stringstream log;
+    log << atom_TKFX::dump();
+    
+    Printer p(&getvalue);
+    
+    if (atom_fourcc == fourcc("ASPI")) {log << BOB_end_dump() << std::endl;}
+    
+    return log.str();
+};
 //TODO: --- EQMB::TKFX --- EqualizerMultiBand
 //TODO: --- WARP::TRKG --- TimeWarp
 //TODO: --- MASK::WARP --- CaptureMask
@@ -422,22 +1001,88 @@ std::string atom_TRKG::dump(void) {
 class    atom_CMPO:public atom_TRKG
 {
 public:  atom_CMPO(){ atom_fourcc = fourcc("CMPO");}
-    bool read(std::ifstream *f);
+    MDVxUUID mobid;
+    uint8_t mobtype;
+    uint32_t usagecode;
+    
+    bool create_object_from_BOB();
     std::string dump(void);
 };
-bool atom_CMPO::read(std::ifstream *f){
-    if (atom_TRKG::read(f)==false) return false; // reading BOB
-    return true;
+bool atom_CMPO::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
+    if (atom_TRKG::create_object_from_BOB()==false) return false;
+
+    getvalue._u8_assert(0x02);
+    getvalue._u8_assert(0x02);
+    
+    getvalue._u32(); //mobidhi
+    getvalue._u32(); //mobidlo
+    getvalue._u32(); //datetime
+    mobtype = getvalue._u8(); //mobtype
+    usagecode = getvalue._u32(); //usagecode
+    read_objref();//descriptor
+    
+    while (uint8_t it = getvalue.getnext_typetag() ){
+        switch (it){
+            case 0x01:
+                getvalue._u8_assert(0x47);
+                getvalue._u32(); //last modified
+                break;
+            case 0x02:
+                getvalue._u8_assert(0x41);
+                getvalue.readMobID(&mobid);
+                break;
+            default:
+                assert(false);
+                break;
+        }
+    }
+    
+    OBJisValid = BOBisValid;
+    return OBJisValid;
 }
 
 std::string atom_CMPO::dump(void) {
+    
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+
     std::stringstream log;
-    uint32_t position = 0x0;
-    uint32_t cp=0;cp++;
+    log << atom_TRKG::dump();
+
+    Printer p(&getvalue);
     
-    log  << BOB_begin_dump ();
-    log << BOB_end_dump() << std::endl;
+    getvalue._u8_assert(0x02);
+    getvalue._u8_assert(0x02);
     
+    
+    log <<"  |--------"<< std::endl;//left.bob
+    log <<"  |-mobidhi: " << p._hexlify_u32(getvalue._u32())<< std::endl;//mobidhi
+    log <<"  |-mobidlo: " << p._hexlify_u32(getvalue._u32())<< std::endl;//mobidlo
+    log <<"  |-lastmod: " << p._hexlify_u32(getvalue._u32())<< std::endl;//last modified
+    log <<"  |-mobtype: " << p._hexlify_u8(getvalue._u8())<< std::endl;//mobtype
+    log <<"  |-usagecode: " << p._hexlify_u32(getvalue._u32())<< std::endl; //usagecode
+    log <<"  |-descriptor[obj]: " << p._hexlify_u32(getvalue._objref())<< std::endl; //usagecode
+
+    while (uint8_t it = getvalue.getnext_typetag() ){
+        switch (it){
+            case 0x01:
+                getvalue._u8_assert(0x47);
+                log <<"  |-creation time: " << p._hexlify_u32(getvalue._u32())<< std::endl;//creation time
+                break;
+            case 0x02:
+                getvalue._u8_assert(0x41);
+                 log <<"  |-mobid: " << p._hexlify_UID(&mobid) << std::endl;
+                 getvalue.readMobID(&mobid);
+                break;
+            default:
+                assert(false);
+                break;
+        }
+    }
+    
+    if (atom_fourcc == fourcc("CMPO")) {log << BOB_end_dump() << std::endl;}
+
     return log.str();
 };
 
@@ -450,22 +1095,24 @@ std::string atom_CMPO::dump(void) {
 class    atom_FILE:public avbATOM
 {
 public:  atom_FILE(){ atom_fourcc = fourcc("FILE");}
-    bool read(std::ifstream *f);
+    bool create_object_from_BOB();
     std::string dump(void);
+    
     std::string path;
     std::string path_posix;
     std::string path_utf8;
     std::string path2_utf8;
 };
-bool atom_FILE::read(std::ifstream *f){
-    if (avbATOM::BOB_read(f)==false) return false; // reading BOB
+bool atom_FILE::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
+
     getvalue.set_pos(0x0L);
     getvalue._u8_assert(0x2);//tag
     getvalue._u8();//version
     path = getvalue._string();
     
-    uint8_t it = getvalue.getnext_typetag();
-    while (it){
+    while (uint8_t it = getvalue.getnext_typetag()){
         switch (it){
             case 0x01:
                 getvalue._u8_assert(0x4C);
@@ -483,20 +1130,21 @@ bool atom_FILE::read(std::ifstream *f){
                 assert(false);
                 break;
         }
-        it = getvalue.getnext_typetag();
     }
-    return true;
+    OBJisValid = BOBisValid;
+    return OBJisValid;
 }
 
 std::string atom_FILE::dump(void) {
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+
     std::stringstream log;
     getvalue.set_pos(0L);
     log  << BOB_begin_dump ();
     getvalue._u8_assert(0x2);//tag
     getvalue._u8_assert(0x2);//version
     log <<"  |-path: "  <<  getvalue._string() << std::endl;
-    uint8_t it = getvalue.getnext_typetag();
-    while (it){
+    while (uint8_t it = getvalue.getnext_typetag()){
         switch (it){
             case 0x01:
                 getvalue._u8_assert(0x4C);
@@ -514,7 +1162,6 @@ std::string atom_FILE::dump(void) {
                 assert(false);
                 break;
         }
-        it = getvalue.getnext_typetag();
     }
 
     log << BOB_end_dump() << std::endl;
@@ -535,24 +1182,28 @@ std::string atom_FILE::dump(void) {
 
 class    atom_MSML:public avbATOM
 {
-public:  atom_MSML(){ atom_fourcc = fourcc("FILE");}
-    bool read(std::ifstream *f);
+public:  atom_MSML(){ atom_fourcc = fourcc("MSML");}
+    bool create_object_from_BOB();
     std::string dump(void);
     MDVxUUID mobid;
     std::string lastknownvolume;
 };
-bool atom_MSML::read(std::ifstream *f){
-    if (avbATOM::BOB_read(f)==false) return false; // reading BOB
+bool atom_MSML::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
     getvalue.set_pos(0x0L);
     getvalue._u8_assert(0x2);//tag
     getvalue._u8_assert(0x2);//version
     mobid.makeFrom2(BOB.data()+getvalue.get_pos());
     getvalue.pos_advance(8);
     lastknownvolume = getvalue._string();
-    return true;
+    OBJisValid = BOBisValid;
+    return OBJisValid;
 }
 
 std::string atom_MSML::dump(void) {
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+
     std::stringstream log;
     Printer p(&getvalue);
     getvalue.set_pos(0L);
@@ -564,8 +1215,7 @@ std::string atom_MSML::dump(void) {
     log <<"  |-lastknownvolume: " << lastknownvolume<< std::endl;
     getvalue.pos_advance(getvalue._u16());
     
-    uint8_t it = getvalue.getnext_typetag();
-    while (it){
+    while (uint8_t it = getvalue.getnext_typetag()){
         switch (it){
             case 0x01:
                 getvalue._u8_assert(0x47);
@@ -587,7 +1237,6 @@ std::string atom_MSML::dump(void) {
                 assert(false);
                 break;
         }
-        it = getvalue.getnext_typetag();
     }
     
     log << BOB_end_dump() << std::endl;
@@ -635,20 +1284,56 @@ std::string atom_MSML::dump(void) {
 class    atom_ATTR:public avbATOM
 {
 public:  atom_ATTR(){ atom_fourcc = fourcc("ATTR");attrCount=0;}
-    bool read(std::ifstream *f);
+    bool create_object_from_BOB();
     std::string dump(void);
     uint32_t attrCount ;
 };
-bool atom_ATTR::read(std::ifstream *f){
-    if (avbATOM::BOB_read(f)==false) return false; // reading BOB
+bool atom_ATTR::create_object_from_BOB(){
+    OBJisValid = false;
+    if (BOBisValid!=true) return OBJisValid;
     getvalue.set_pos(0x0L);
     getvalue._u8_assert(0x2);//tag
     getvalue._u8_assert(0x1);//version
     attrCount = getvalue._u32();
-    return true;
+    uint32_t i=0;
+    while (i < attrCount){
+        uint32_t attrtype = getvalue._u32();
+        getvalue.pos_advance(getvalue._u16());//getvalue._string();
+        switch (attrtype){
+            case ATTR_IntegerAttribute:
+            {
+                getvalue._u32();
+                break;
+            }
+            case ATTR_StringAttribute:
+            {
+                getvalue.pos_advance(getvalue._u16());//getvalue._string();
+                break;
+            }
+            case ATTR_ObjectAttribute:
+            {
+               read_objref();
+               break;
+            }
+            case ATTR_DataValueAttribute:
+            {
+                uint32_t datasize = getvalue._u32();
+                getvalue.pos_advance(datasize);
+                break;
+            }
+            default:
+                assert(false);
+                break;
+        }
+        i++;
+    }
+    OBJisValid = BOBisValid;
+    return OBJisValid;
 }
 
 std::string atom_ATTR::dump(void) {
+    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
+
     std::stringstream log;
     Printer p(&getvalue);
     getvalue.set_pos(0L);
@@ -673,7 +1358,7 @@ std::string atom_ATTR::dump(void) {
             }
             case ATTR_ObjectAttribute:
             {
-                log <<" [obj] " << p._hexlify_u32(getvalue._u32())  << std::endl;
+                log <<" [obj] " << p._hexlify_u32(getvalue._objref())  << std::endl;
                 break;
             }
             case ATTR_DataValueAttribute:
@@ -719,20 +1404,21 @@ std::string atom_ATTR::dump(void) {
 //TODO:class prototype
 //class    atom_FILE:public avbATOM
 //{
-//public:  atom_FILE(){ atom_fourcc = fourcc("FILE");}
-//    bool read(std::ifstream *f);
+//public:  atom_FILE(){ atom_fourcc = fourcc("X3X3");}
+//    bool create_object_from_BOB();
 //    std::string dump(void);
 //};
-//bool atom_FILE::read(std::ifstream *f){
-//    if (avbATOM::BOB_read(f)==false) return false; // reading BOB
-//    uint32_t cp=0;cp++;
-//    return true;
+//bool atom_FILE::::create_object_from_BOB(){
+//    OBJisValid = false;
+//    if (BOBisValid!=true) return OBJisValid;
+//    //methods here
+//    OBJisValid = BOBisValid;
+//    return OBJisValid;
 //}
 //
 //std::string atom_FILE::dump(void) {
+//    if (OBJisValid==false) return avbATOM::dumpInvalidObject();
 //    std::stringstream log;
-//    uint32_t position = 0x0;
-//    uint32_t cp=0;cp++;
 //
 //    log  << BOB_begin_dump ();
 //    log << BOB_end_dump( position) << std::endl;
@@ -749,7 +1435,7 @@ bool avbTOC::read(std::ifstream * f){
     std::unique_ptr<avbATOM> OBJD = factory.Create(fourcc("OBJD"));
     TOC.push_back(std::move(OBJD));
     TOC[0]->init(this);
-    bool result = TOC[0]->read(f);
+    bool result = TOC[0]->BOB_read(f);
     if (result!=true)return false;
     char fcc[4];
     while (++next_TOCid<TOC.size() )
@@ -759,7 +1445,11 @@ bool avbTOC::read(std::ifstream * f){
         TOC[next_TOCid] = factory.Create(MAKEFOURCC(fcc[0], fcc[1], fcc[2], fcc[3]));
         TOC[next_TOCid]->init(this);
         TOC[next_TOCid]->TOC_id=next_TOCid;
-        if (TOC[next_TOCid]->read(f)==false) next_TOCid--;
+        if (TOC[next_TOCid]->BOB_read(f)==false) break;
+    }
+    
+    for (uint32_t i = 1;i<next_TOCid;i++){
+        TOC[i]->create_object_from_BOB();
     }
 
     return result;
@@ -771,8 +1461,9 @@ std::string avbTOC::dump (void){
     }
     return log;
 }
-avbATOM *  avbTOC::pATOM_atTOC(uint32_t TOC_id){
-    return TOC[TOC_id].get();
+
+avbATOM *  avbTOC:: at (uint32_t TOC_id){
+    return TOC.at(TOC_id).get();
 };
 
 
@@ -786,73 +1477,73 @@ ATOMFactory::ATOMFactory()
     this -> Register<fourcc("OBJD"),atom_OBJD>();
     this -> Register<fourcc("ABIN"),atom_ABIN>(); //ABIN root object
     this -> Register<fourcc("BINF"),atom_ABIN>(); //BINF root object
+    
     this -> Register<fourcc("FILE"),atom_FILE>(); //FILE MacFileLocator
     this -> Register<fourcc("WINF"),atom_FILE>(); //WINF WinFileLocator
     this -> Register<fourcc("ATTR"),atom_ATTR>(); //ATTR Attributes
     this -> Register<fourcc("MSML"),atom_MSML>(); //MSMLocator
 
-    this -> Register<fourcc("CMPO"),atom_CMPO>(); //CMPO Composition CMPO->TRKG->COMP->ATOM
+    this -> Register<fourcc("CMPO"),atom_CMPO>(); //CMPO Composition COMP|TRKG|CMPO
 
  
   
-//            this -> Register<fourcc("AIFC"),atom_AIFC>(); //AIFFDescriptor
-    //        this -> Register<fourcc("ANCD"),atom_ANCD>();
-    //        this -> Register<fourcc("ASPI"),atom_ASPI>();
-    //        this -> Register<fourcc("AVUP"),atom_AVUP>();
-    //        this -> Register<fourcc("BVst"),atom_BVst>(); //ABinViewSetting
-    //        this -> Register<fourcc("CCFX"),atom_CCFX>(); //Color correction FX
-    //        this -> Register<fourcc("CDCI"),atom_CDCI>(); //CDCIDescriptor
-    //        this -> Register<fourcc("CTRL"),atom_CTRL>();
-    //        this -> Register<fourcc("DIDP"),atom_DIDP>(); //DIDPosition
-    //        this -> Register<fourcc("ECCP"),atom_ECCP>(); //AEdgecodeClip
-    //        this -> Register<fourcc("EQMB"),atom_EQMB>();
-
-    //        this -> Register<fourcc("FILL"),atom_FILL>(); //AFillerClip
-    //        this -> Register<fourcc("FXPS"),atom_FXPS>(); //AEffectKFList
-    //        this -> Register<fourcc("GRFX"),atom_GRFX>(); //AGraphicEffectAttr
-    //        this -> Register<fourcc("Iprj"),atom_Iprj>();
-    //        this -> Register<fourcc("JPED"),atom_JPED>();
-    //        this -> Register<fourcc("MASK"),atom_MASK>(); //ACaptureMask
-//            this -> Register<fourcc("MCBR"),atom_MCBR>(); //Bin Reference
-    //        this -> Register<fourcc("MCMR"),atom_MCMR>();
-    //        this -> Register<fourcc("MDES"),atom_MDES>(); //AMediaDesc
-    //        this -> Register<fourcc("mdes"),atom_mdes>(); //AMediaDesc - omf2MDES
-    //        this -> Register<fourcc("MDFL"),atom_MDFL>(); //AMediaFile
-    //        this -> Register<fourcc("MDFM"),atom_MDFM>();
-    //        this -> Register<fourcc("MDNG"),atom_MDNG>();
-    //        this -> Register<fourcc("MDTP"),atom_MDTP>(); //ATapeMediaDesc
-    //        this -> Register<fourcc("MPGI"),atom_MPGI>();
-    //        this -> Register<fourcc("MPGP"),atom_MPGP>();
-    //        this -> Register<fourcc("MULD"),atom_MULD>();
-    //        this -> Register<fourcc("PCMA"),atom_PCMA>(); //PCM audio
-    //        this -> Register<fourcc("PRCL"),atom_PRCL>(); //AParamClip
-    //        this -> Register<fourcc("PRIT"),atom_PRIT>(); //aPAram???
-    //        this -> Register<fourcc("PRLS"),atom_PRLS>(); //AParamList
-    //        this -> Register<fourcc("PVOL"),atom_PVOL>(); //APanVolEffect
-    //        this -> Register<fourcc("REPT"),atom_REPT>();
-    //        this -> Register<fourcc("RGBA"),atom_RGBA>(); //RGBADescriptor
-    //        this -> Register<fourcc("RLED"),atom_RLED>();
-    //        this -> Register<fourcc("RSET"),atom_RSET>(); //ARepSet
-    //        this -> Register<fourcc("SCLP"),atom_SCLP>(); //ASourceClip
-    //        this -> Register<fourcc("SEQU"),atom_SEQU>(); //ASequence
-    //        this -> Register<fourcc("SETG"),atom_SETG>(); //ASettingGroup - Settings only -
-    //        this -> Register<fourcc("SHLP"),atom_SHLP>();
-    //        this -> Register<fourcc("SLCT"),atom_SLCT>();
-    //        this -> Register<fourcc("SLPI"),atom_SLPI>();
-    //        this -> Register<fourcc("SPED"),atom_SPED>();
-    //        this -> Register<fourcc("STRB"),atom_STRB>();
-    //        this -> Register<fourcc("TCCP"),atom_TCCP>(); //ATimecodeClip
-    //        this -> Register<fourcc("TKDA"),atom_TKDA>();
-    //        this -> Register<fourcc("TKDS"),atom_TKDS>();
-    //        this -> Register<fourcc("TKFX"),atom_TKFX>(); //ATrackEffect
-    //        this -> Register<fourcc("TKPA"),atom_TKPA>();
-    //        this -> Register<fourcc("TKPS"),atom_TKPS>();
-    //        this -> Register<fourcc("TMBC"),atom_TMBC>(); //ATmpCrumb
-    //        this -> Register<fourcc("TMCS"),atom_TMCS>(); //TmpBreadCrumbs
-    //        this -> Register<fourcc("TNFX"),atom_TNFX>(); //ATransEffect
-    //        this -> Register<fourcc("TRKR"),atom_TRKR>(); //ATrackRef
-    //        this -> Register<fourcc("URLL"),atom_URLL>();
-    //        this -> Register<fourcc("WAVE"),atom_WAVE>(); //WAVEDescriptor
+//    this -> Register<fourcc("AIFC"),atom_AIFC>(); //AIFFDescriptor
+//    this -> Register<fourcc("ANCD"),atom_ANCD>();
+    this -> Register<fourcc("ASPI"),atom_ASPI>();
+//    this -> Register<fourcc("AVUP"),atom_AVUP>();
+//    this -> Register<fourcc("BVst"),atom_BVst>(); //ABinViewSetting
+//    this -> Register<fourcc("CCFX"),atom_CCFX>(); //Color correction FX
+//    this -> Register<fourcc("CDCI"),atom_CDCI>(); //CDCIDescriptor
+    this -> Register<fourcc("CTRL"),atom_CTRL>();
+//    this -> Register<fourcc("DIDP"),atom_DIDP>(); //DIDPosition
+    this -> Register<fourcc("ECCP"),atom_ECCP>(); //AEdgecodeClip
+//    this -> Register<fourcc("EQMB"),atom_EQMB>();
+    this -> Register<fourcc("FILL"),atom_FILL>(); //AFillerClip
+//    this -> Register<fourcc("FXPS"),atom_FXPS>(); //AEffectKFList
+//    this -> Register<fourcc("GRFX"),atom_GRFX>(); //AGraphicEffectAttr
+//    this -> Register<fourcc("Iprj"),atom_Iprj>();
+//    this -> Register<fourcc("JPED"),atom_JPED>();
+//    this -> Register<fourcc("MASK"),atom_MASK>(); //ACaptureMask
+//    this -> Register<fourcc("MCBR"),atom_MCBR>(); //Bin Reference
+//    this -> Register<fourcc("MCMR"),atom_MCMR>();
+//    this -> Register<fourcc("MDES"),atom_MDES>(); //AMediaDesc
+//    this -> Register<fourcc("mdes"),atom_mdes>(); //AMediaDesc - omf2MDES
+//    this -> Register<fourcc("MDFL"),atom_MDFL>(); //AMediaFile
+//    this -> Register<fourcc("MDFM"),atom_MDFM>();
+//    this -> Register<fourcc("MDNG"),atom_MDNG>();
+//    this -> Register<fourcc("MDTP"),atom_MDTP>(); //ATapeMediaDesc
+//    this -> Register<fourcc("MPGI"),atom_MPGI>();
+//    this -> Register<fourcc("MPGP"),atom_MPGP>();
+//    this -> Register<fourcc("MULD"),atom_MULD>();
+//    this -> Register<fourcc("PCMA"),atom_PCMA>(); //PCM audio
+    this -> Register<fourcc("PRCL"),atom_PRCL>(); //AParamClip
+//    this -> Register<fourcc("PRIT"),atom_PRIT>(); //aPAram???
+//    this -> Register<fourcc("PRLS"),atom_PRLS>(); //AParamList
+    this -> Register<fourcc("PVOL"),atom_PVOL>(); //APanVolEffect
+//    this -> Register<fourcc("REPT"),atom_REPT>();
+//    this -> Register<fourcc("RGBA"),atom_RGBA>(); //RGBADescriptor
+//    this -> Register<fourcc("RLED"),atom_RLED>();
+//    this -> Register<fourcc("RSET"),atom_RSET>(); //ARepSet
+    this -> Register<fourcc("SCLP"),atom_SCLP>(); //ASourceClip
+    this -> Register<fourcc("SEQU"),atom_SEQU>(); //ASequence
+//    this -> Register<fourcc("SETG"),atom_SETG>(); //ASettingGroup - Settings only -
+//    this -> Register<fourcc("SHLP"),atom_SHLP>();
+//    this -> Register<fourcc("SLCT"),atom_SLCT>();
+//    this -> Register<fourcc("SLPI"),atom_SLPI>();
+//    this -> Register<fourcc("SPED"),atom_SPED>();
+//    this -> Register<fourcc("STRB"),atom_STRB>();
+    this -> Register<fourcc("TCCP"),atom_TCCP>(); //ATimecodeClip
+//    this -> Register<fourcc("TKDA"),atom_TKDA>();
+//    this -> Register<fourcc("TKDS"),atom_TKDS>();
+    this -> Register<fourcc("TKFX"),atom_TKFX>(); //ATrackEffect
+//    this -> Register<fourcc("TKPA"),atom_TKPA>();
+//    this -> Register<fourcc("TKPS"),atom_TKPS>();
+//    this -> Register<fourcc("TMBC"),atom_TMBC>(); //ATmpCrumb
+//    this -> Register<fourcc("TMCS"),atom_TMCS>(); //TmpBreadCrumbs
+//    this -> Register<fourcc("TNFX"),atom_TNFX>(); //ATransEffect
+    this -> Register<fourcc("TRKR"),atom_TRKR>(); //ATrackRef
+//    this -> Register<fourcc("URLL"),atom_URLL>();
+//    this -> Register<fourcc("WAVE"),atom_WAVE>(); //WAVEDescriptor
     }
 
 

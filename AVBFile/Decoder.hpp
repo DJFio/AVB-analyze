@@ -45,7 +45,8 @@ public:
     uint32_t     _u32(void);
     uint16_t     _u16(void);
     uint8_t      _u8 (void);
-    
+    uint32_t     _objref(void);
+
     std::string  _string (void);
     std::string  _fourcc (void);
     uint32_t     _fourcc_u32 (void);

@@ -43,5 +43,16 @@ enum ATTRType
 };
 
 
+#define TRACK_LABEL_FLAG             (1 << 0)
+#define TRACK_ATTRIBUTES_FLAG        (1 << 1)
+#define TRACK_COMPONENT_FLAG         (1 << 2)
+#define TRACK_FILLER_PROXY_FLAG      (1 << 3)
+#define TRACK_BOB_DATA_FLAG          (1 << 4)
+#define TRACK_CONTROL_CODE_FLAG      (1 << 5)
+#define TRACK_CONTROL_SUB_CODE_FLAG  (1 << 6)
+#define TRACK_START_POS_FLAG         (1 << 7)
+#define TRACK_READ_ONLY_FLAG         (1 << 8)
+#define TRACK_SESSION_ATTR_FLAG      (1 << 9)
+#define TRACK_UNKNOWN_FLAGS          (0xFC00)
 
 #endif /* AVBTypes_hpp */

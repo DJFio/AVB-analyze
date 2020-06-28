@@ -37,23 +37,29 @@ public:
     uint32_t    atom_fourcc;   // = fourcc('ATOM');
     uint32_t    length;        // BOB Length
     std::vector<char>BOB;      // bunch of bytes - the object
+    bool BOBisValid = false;   //Bob read succeed
+    bool OBJisValid = false;   //Object state
     Decoder getvalue;
 
     uint32_t hash (void) const { return TOC_id;} // simple hash
     bool operator==(const avbATOM& b) const  { return TOC_id==b.TOC_id;}
     bool operator< (const avbATOM& b) const  { return TOC_id< b.TOC_id;}
  
-
-
-
     virtual void init(avbTOC * pParentTOC);
-    virtual bool read(std::ifstream *f);
+    virtual bool BOB_read(std::ifstream *f);
+    virtual bool create_object_from_BOB();
+
+//    virtual bool BOB_make(void);
     virtual bool write(std::ofstream *f);
-    virtual std::string dump(void);
     
-    bool BOB_read(std::ifstream *f);
+    virtual std::string dump(void);
+    virtual std::string dumpInvalidObject(void);
+
+    
     std::string BOB_end_dump(void);
     std::string BOB_begin_dump(uint32_t pos=0L);
+    
+    uint32_t read_objref(void);
 };
 
 
@@ -116,16 +122,12 @@ public:
     bool getByteswap(void) {return usebyteswap;}
     void setRootObject(uint32_t tocid) {TOCRootObject=tocid;}
     void resizeTOC(uint32_t numobjects) {TOC.resize(numobjects+1);}//taking in account OBJD root object which has index[0]
-    avbATOM * pATOM_atTOC(uint32_t TOC_id);
+    avbATOM *  at (uint32_t TOC_id);
     bool read(std::ifstream * f);
 //    bool write(std::ofstream f);
     std::string dump (void);
 
 private:
-//    avbATOM * add_atom(avbATOM * atom);
-//    bool delete_atom(uint32_t TOC_id); //decrease refcount and find all references to this atom.
-//    bool delete_atom(avbATOM * atom);  //decrease refcount and find all references to this atom.
-//    void swap (uint32_t TOC_id_1,uint32_t TOC_id_2);
 
     bool   usebyteswap = false;
     uint32_t next_TOCid=0;
