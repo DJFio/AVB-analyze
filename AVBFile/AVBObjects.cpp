@@ -742,13 +742,17 @@ bool atom_TRKG::create_object_from_BOB(){
     getvalue._u32();//length
     getvalue._u32();//numscalars
     uint32_t trCount = getvalue._u32();//trackcount
-    for (int i=0;i<trCount;i++){
+    
+    for (uint32_t i=0;i<trCount;i++){
         uint16_t flags = getvalue._u16();//flags for track
+        
+        if (flags & TRACK_UNKNOWN_FLAGS)
+            assert(false);//("Unknown Track Flag: %d" % flags);
         
         if (flags & TRACK_LABEL_FLAG)
             getvalue._s16();
         
-        else if (flags & TRACK_ATTRIBUTES_FLAG)
+        if (flags & TRACK_ATTRIBUTES_FLAG)
             read_objref();
         
         if (flags & TRACK_SESSION_ATTR_FLAG)
@@ -774,10 +778,9 @@ bool atom_TRKG::create_object_from_BOB(){
 
         if (flags & TRACK_READ_ONLY_FLAG)
             getvalue._u8();
-
-        if (flags & TRACK_UNKNOWN_FLAGS)
-            assert(false);//("Unknown Track Flag: %d" % flags);
         
+    
+   
     }
     while (uint8_t it = getvalue.getnext_typetag() ){
         switch (it){
@@ -816,16 +819,19 @@ std::string atom_TRKG::dump(void) {
     uint32_t trCount = getvalue._u32();//trackcount
     log <<"  |-track count: " << p._hexlify_u32(trCount) << std::endl;
     
-    for (int i=0;i<trCount;i++){
+    for (uint32_t i=0;i<trCount;i++){
         uint16_t flags = getvalue._u16();//flags for track
         log <<"  |-track["<< i <<"] flags: " << p._hexlify_u16(flags) ;
 
+        if (flags & TRACK_UNKNOWN_FLAGS)
+            assert(false);//("Unknown Track Flag: %d" % flags);
+        
         if (flags & TRACK_LABEL_FLAG)
         {
             log <<"|label: " <<  p._hexlify_u16(getvalue._s16());
         }
         
-        else if (flags & TRACK_ATTRIBUTES_FLAG)
+        if (flags & TRACK_ATTRIBUTES_FLAG)
         {
              log <<"|track_attr[obj]: " <<p._hexlify_u32(getvalue._objref());
         }
@@ -870,8 +876,6 @@ std::string atom_TRKG::dump(void) {
             log <<"|read only: " << p._hexlify_u8(getvalue._u8());
         }
         
-        if (flags & TRACK_UNKNOWN_FLAGS)
-            assert(false);//("Unknown Track Flag: %d" % flags);
         
         log << std::endl;
         
@@ -1463,6 +1467,7 @@ std::string avbTOC::dump (void){
 }
 
 avbATOM *  avbTOC:: at (uint32_t TOC_id){
+    assert (TOC_id<TOC.size());
     return TOC.at(TOC_id).get();
 };
 
