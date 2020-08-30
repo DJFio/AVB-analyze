@@ -62,9 +62,15 @@ bool avbATOM::BOB_read(std::ifstream *f){
     BOB.resize(length);
     f->read(BOB.data(),length);
     getvalue.set_pos(0L);
+    if ( length == 0x1){
+        assert (BOB[0]==0x03);
+        if (BOB[0]==0x03) BOBisValid = true;
+        else BOBisValid = false;
+    } else {
     assert ((BOB[0]==0x02)&&(BOB[length-1]==0x03));
     if ((BOB[0]==0x02)&&(BOB[length-1]==0x03)) BOBisValid = true;
     else BOBisValid = false;
+    }
     return BOBisValid;
 }
 bool avbATOM::create_object_from_BOB(){
@@ -115,7 +121,7 @@ std::string avbATOM::dump(void) {
     std::stringstream log;
     Printer p(&getvalue);
     log << BOB_begin_dump();
-    log  <<"  |-@begin:" <<  p._hexlify_u8(getvalue._u8()) << std::endl;;
+    if (length>1) log  <<"  |-@begin:" <<  p._hexlify_u8(getvalue._u8()) << std::endl;;
     log << BOB_end_dump() << std::endl;
 
     return log.str();
