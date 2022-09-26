@@ -36,10 +36,11 @@ public:
     uint32_t hasReferencesToOtherOBJs = 0L;
     uint32_t    atom_fourcc;   // = fourcc('ATOM');
     uint32_t    length;        // BOB Length
-    std::vector<char>BOB;      // bunch of bytes - the object
+    std::vector<uint8_t>BOB;      // bunch of bytes - the object
     bool BOBisValid = false;   //Bob read succeed
     bool OBJisValid = false;   //Object state
     Decoder getvalue;
+    std::ifstream::pos_type srcFileOffset = -1;
 
     uint32_t hash (void) const { return TOC_id;} // simple hash
     bool operator==(const avbATOM& b) const  { return TOC_id==b.TOC_id;}
@@ -54,8 +55,8 @@ public:
     
     virtual std::string dump(void);
     virtual std::string dumpInvalidObject(void);
+    virtual std::string dumpBase(void);
 
-    
     std::string BOB_end_dump(void);
     std::string BOB_begin_dump(uint32_t pos=0L);
     
@@ -123,8 +124,9 @@ public:
     void setRootObject(uint32_t tocid) {TOCRootObject=tocid;}
     void resizeTOC(uint32_t numobjects) {TOC.resize(numobjects+1);}//taking in account OBJD root object which has index[0]
     avbATOM *  at (uint32_t TOC_id);
+    uint32_t size (void);
     bool read(std::ifstream * f);
-//    bool write(std::ofstream f);
+    bool write(std::ofstream * f);
     std::string dump (void);
 
 private:
@@ -139,4 +141,67 @@ private:
 
 
 
+
+
+//TODO: --- OBJD::Atom ---
+
+class atom_OBJD: public avbATOM {
+public:
+    atom_OBJD(){
+        atom_fourcc = fourcc("OBJD");
+        length = 0x77;
+        BOB.resize(length);
+        TOCObjCount=0;
+        TOCRootObject=0;
+        memset(BINUID.UMIDx, 0x0, 0x20);
+    }
+    uint32_t TOCObjCount;
+    uint32_t TOCRootObject;
+    MDVxUUID BINUID;
+    bool BOB_read(std::ifstream *f);
+    std::string dump(void);
+    std::string dumpBase(void);
+};
+
+
+//TODO: --- ABIN::Atom ---
+//TODO: --- BINF::Atom ---
+
+class atom_ABIN: public avbATOM {
+public:
+    atom_ABIN(){
+        atom_fourcc = fourcc("ABIN");
+    }
+    bool create_object_from_BOB();
+    std::string dump(void);
+    std::string dumpBase(void);
+
+    bool largebin = false;
+    uint32_t BVst_id = 0;
+    uint32_t ATTR_id = 0;
+    MDVxUUID rootObjUID;
+    uint32_t CMPOcount = 0;
+
+};
+
+
+//TODO: --- COMP::Atom --- Component
+class    atom_COMP:public avbATOM
+{
+public:  atom_COMP(){ atom_fourcc = fourcc("COMP");}
+    bool create_object_from_BOB();
+    std::string dump(void);
+    std::string getName(void);
+};
+
 #endif /* AVBObjects_hpp */
+
+
+//TODO: --- ATTR::Atom --- (Attributes)
+class    atom_ATTR:public avbATOM
+{
+public:  atom_ATTR(){ atom_fourcc = fourcc("ATTR");attrCount=0;}
+    bool create_object_from_BOB();
+    std::string dump(void);
+    uint32_t attrCount ;
+};

@@ -55,12 +55,13 @@ void avbATOM::init(avbTOC *pParentTOC){
 }
 bool avbATOM::BOB_read(std::ifstream *f){
     hasReferencesToOtherOBJs=0L;
+    srcFileOffset = f->tellg();
     f->read(reinterpret_cast<char*>(&atom_fourcc), 4);// position += 4;//ATOM name
     f->read(reinterpret_cast<char*>(&length),4);
     length = Byte_Cast32(length, getvalue.get_bswap());//position += 4;//ATOM size
     //read data[size]
     BOB.resize(length);
-    f->read(BOB.data(),length);
+    f->read(reinterpret_cast<char*>(BOB.data()),length);
     getvalue.set_pos(0L);
     if ( length == 0x1){
         assert (BOB[0]==0x03);
@@ -97,7 +98,7 @@ std::string avbATOM::BOB_begin_dump(uint32_t pos){
     getvalue.set_pos(pos);
     std::stringstream log;
     Printer p(&getvalue);
-    log  << "TOC#" << p._hexlify_u32(TOC_id)<< std::endl;;
+    log <<"TOC#" << p._hexlify_u32(TOC_id)<<  "|Offset 0x" << std::hex << srcFileOffset << std::endl;;
     log <<"|" << p._fourcc_from_u32(atom_fourcc);
     log <<"|len:" << p._hexlify_u32(length) ;
     log <<"|referenced =" << p._hexlify_u32(referenceCount) << "|RefToOtherOBJ=" << p._hexlify_u32(hasReferencesToOtherOBJs) << std::endl;
@@ -112,7 +113,7 @@ bool avbATOM::write(std::ofstream *f){
     f->write(reinterpret_cast<char*>(&atom_fourcc),4);
     uint32_t cvtlength= getvalue.cvt32(length);
     f->write(reinterpret_cast<char*>(&cvtlength),4);
-    f->write(BOB.data(),length);
+    f->write(reinterpret_cast<char*>(BOB.data()),length);
     return true;
 }
 std::string avbATOM::dump(void) {
@@ -140,6 +141,15 @@ std::string avbATOM::dumpInvalidObject(void){
     }
     return log.str();
 }
+std::string avbATOM::dumpBase(void) {
+
+    std::stringstream log;
+    Printer p(&getvalue);
+    log << BOB_begin_dump();
+    if (OBJisValid==false)  { log  <<"  |-invalid_OBJECT " << p._hexlify_u32(length) <<std::endl;}
+//    log << BOB_end_dump() << std::endl;
+    return log.str();
+};
 
 uint32_t avbATOM::read_objref(){
     uint32_t pObj = getvalue._objref();
@@ -151,31 +161,16 @@ uint32_t avbATOM::read_objref(){
 }
 
 
+
 //TODO: --- OBJD::Atom ---
 
-class atom_OBJD: public avbATOM {
-public:
-    atom_OBJD(){
-        atom_fourcc = fourcc("OBJD");
-        length = 0x77;
-        BOB.resize(length);
-        TOCObjCount=0;
-        TOCRootObject=0;
-        memset(BINUID.UMIDx, 0x0, 0x20);
-    }
-    uint32_t TOCObjCount;
-    uint32_t TOCRootObject;
-    MDVxUUID BINUID;
-    bool BOB_read(std::ifstream *f);
-    std::string dump(void);
 
-};
 
 bool atom_OBJD::BOB_read(std::ifstream *f){
     BOBisValid = false;
     std::streamsize avbsize =f->tellg();
     f->seekg(0, std::ios::beg);
-    assert (avbsize > 0x77);
+    srcFileOffset = f->tellg();
     if (avbsize < 0x77) // the header entry in avb file is 0x77 bytes long
     {
 //        std::cout << "problem with AVB File :: too small " << std::endl; redir_flush;
@@ -183,7 +178,7 @@ bool atom_OBJD::BOB_read(std::ifstream *f){
 
     }
     
-    if (f->read(BOB.data(), 0x77))
+    if (f->read(reinterpret_cast<char*>(BOB.data()), 0x77))
     {
         hasReferencesToOtherOBJs=0L;
         char avbmagic[10] = AVB_MAGIC;
@@ -215,7 +210,7 @@ bool atom_OBJD::BOB_read(std::ifstream *f){
         hasReferencesToOtherOBJs++;
         pTOC->setRootObject(TOCRootObject);
         getvalue._fourcc_u32();    //IIII
-        BINUID.makeFrom2(BOB.data()+getvalue.get_pos()); getvalue.pos_advance(8);
+        BINUID.makeFrom2(reinterpret_cast<char*>(BOB.data()+getvalue.get_pos())); getvalue.pos_advance(8);
         getvalue._fourcc_u32();    //filetype
         getvalue._fourcc_u32();    //creator
         getvalue.pos_advance(getvalue._u16());//getvalue._string();        //creator[string]
@@ -254,6 +249,35 @@ bool atom_OBJD::BOB_read(std::ifstream *f){
         return log.str();
     }
 
+std::string atom_OBJD::dumpBase(void)
+{
+    if (OBJisValid==false) return avbATOM::dumpBase();
+
+    std::stringstream log;
+    Printer p(&getvalue);
+    
+    
+    log  << BOB_begin_dump ();
+//    getvalue.set_pos(0x0L);
+    getvalue.pos_advance(getvalue._u16());//getvalue._string();// Domain
+    getvalue._fourcc_u32();//ATOM OBJD
+    getvalue.pos_advance(getvalue._u16());//getvalue._string();//objdoc
+    getvalue._u8();//version
+    log <<"  |-lastsave        : "<< getvalue._string()<< std::endl; //string:date
+    getvalue._u32();//tocobj count
+    getvalue._objref();//tocrootobject
+    log <<"  |-order           : "<< getvalue._fourcc()<< std::endl;   //IIII
+    log <<"  |-OBJD:UID hi::lo : "<< p._hexlify_short_UID(&BINUID)<< std::endl;    getvalue.pos_advance(8);
+    getvalue._fourcc_u32();    //filetype
+    getvalue._fourcc_u32();    //creator
+    log <<"  |-CreatorVersion  : "<< getvalue._string()<< std::endl;   //creator[string]
+    getvalue.pos_advance(16);  //[zeroes]
+    log << std::endl;
+
+    
+    
+    return log.str();
+}
 
 
 //TODO: ------------------* Bin ---
@@ -264,21 +288,7 @@ bool atom_OBJD::BOB_read(std::ifstream *f){
 //TODO: --- BINF::Atom ---
 
 
-class atom_ABIN: public avbATOM {
-public:
-    atom_ABIN(){
-        atom_fourcc = fourcc("ABIN");
-    }
-    bool create_object_from_BOB();
-    std::string dump(void);
 
-    bool largebin = false;
-    uint32_t BVst_id = 0;
-    uint32_t ATTR_id = 0;
-    MDVxUUID rootObjUID;
-    uint32_t CMPOcount = 0;
-
-};
 
 bool atom_ABIN::create_object_from_BOB(){
     OBJisValid = false;
@@ -290,7 +300,7 @@ bool atom_ABIN::create_object_from_BOB(){
 
     largebin  = (getvalue._u8()==0xf);
     BVst_id = read_objref();
-    rootObjUID.makeFrom2(BOB.data()+getvalue.get_pos()); getvalue.pos_advance(8);
+    rootObjUID.makeFrom2(reinterpret_cast<char*>(BOB.data()+getvalue.get_pos())); getvalue.pos_advance(8);
     if (!largebin){ CMPOcount = static_cast<uint32_t> (getvalue._u16());}
     else { CMPOcount = static_cast<uint32_t> (getvalue._u32());}
     for (uint32_t i = 0 ; i<CMPOcount;i++){
@@ -377,24 +387,97 @@ std::string atom_ABIN::dump(void){
 
     //BINF
     if (atom_fourcc==fourcc("BINF")){
-        log  <<"  |-(BINF unknown 02 01 + [obj]):"<<p._hexlify_u16(getvalue._u16())<<"|" <<p._hexlify_u32(getvalue._objref())<< "|=>OBJ'" << std::endl;
+        log  <<"  |-(BINF ATTR [02 01]+[obj]):"<<p._hexlify_u16(getvalue._u16())<<"|" <<p._hexlify_u32(getvalue._objref())<< "|=>OBJ'" << std::endl;
     }
 
     log << BOB_end_dump() << std::endl;
 
     return log.str();
 }
+std::string atom_ABIN::dumpBase(void)
+{
+    if (OBJisValid==false) return avbATOM::dumpBase();
 
+    std::stringstream log;
+    Printer p(&getvalue);
+    getvalue.set_pos(0L);
+    
+    if (atom_fourcc==fourcc("BINF")){
+        log  <<"Media Composer First Bin File (BINF)"<< std::endl<< std::endl;
+    }
+    else {
+        log  <<"Media Composer Bin File (BINA)"<< std::endl<< std::endl;
+    }
+    
+//    log << pTOC->at(ATTR_id)->dump();
+       
+    getvalue._u8 ();
+    log  <<"  |-ver/bintype: " << (largebin ? ":large": ":notlarge" )<< std::endl; getvalue.pos_advance(1);
+    getvalue.pos_advance(4);
+    //TODO: unsert DUMP BVst here
+    log  <<"  |-UID64: "<<p._hexlify_short_UID(&rootObjUID) << std::endl;getvalue.pos_advance(8);
+    log  <<"  |-CMPOItems: "<<p._hexlify_u32(CMPOcount) << std::endl; if (!largebin){ getvalue.pos_advance(2); } else { getvalue.pos_advance(4);}
+    for (uint32_t i = 0 ; i<CMPOcount;i++){
+        uint32_t pObj = getvalue._objref();
+        log  <<"  |-CMPOref# "<<i<<"|TOC=" <<p._hexlify_u32(pObj);
+        getvalue._u16();
+        getvalue._u16();
+        getvalue._u32();
+        log  <<"|userplaced: " <<p._hexlify_u8(getvalue._u8());
+        log  <<"|OBJ=>'"  << "|name:" << reinterpret_cast<atom_COMP*>(pTOC->at(pObj))->getName() << std::endl;
+        //TODO:add CMPO DUMP here;
+        //                    log  <<")OBJ=>'" << getvalue._fourcc(refto)<<"'"<< std::endl;
+    }
+    getvalue._u32();
+    getvalue._u16();
+    getvalue._u8();
+    for (uint32_t i = 0 ; i<6;i++){
+        getvalue._u16();
+        getvalue._string();
+        getvalue._string();
+    }
+    uint16_t sort_column_count =  getvalue._u16();
+    for (uint16_t i = 0 ; i<sort_column_count;i++){
+        getvalue._u8();
+        getvalue._string();
+    }
+    getvalue._u16();
+    getvalue._u16();
+    getvalue._u16();
+    getvalue._u16();
+    getvalue._u16();
+    getvalue._u16();
+    getvalue._u16();
+    getvalue._u16();
+    getvalue._u16();
+    getvalue._u16();
+    getvalue._u16();
+    getvalue._u16();
+    getvalue._u16();
+    getvalue._u16();
+    getvalue._u16();
+    getvalue._u16();
+    getvalue._u16();
+    getvalue.pos_advance(4); //log  <<"  |-TOC =>ATTR: "<<p._hexlify_u32(ATTR_id) << "|OBJ=>'"  << std::endl;
+    //TODO add ATTR dump here << getvalue._fourcc(TOC[getvalue._u32(ATTR_id])<<"'"
+    getvalue._u8();
+
+    //BINF
+    if (atom_fourcc==fourcc("BINF")){
+        log  <<"  |-(BINF unknown 02 01 + [obj]):"<<p._hexlify_u16(getvalue._u16())<<"|" <<p._hexlify_u32(getvalue._objref())<< "|=>OBJ'" << std::endl;
+    }
+
+    return log.str();
+
+    
+    
+    return log.str();
+}
 
 
 //TODO: ------------------* Components ---
 //TODO: --- COMP::Atom --- Component
-class    atom_COMP:public avbATOM
-{
-public:  atom_COMP(){ atom_fourcc = fourcc("COMP");}
-    bool create_object_from_BOB();
-    std::string dump(void);
-};
+
 bool atom_COMP::create_object_from_BOB(){
     OBJisValid = false;
     if (BOBisValid!=true) return OBJisValid;
@@ -466,6 +549,11 @@ std::string atom_COMP::dump(void) {
 
     return log.str();
 };
+std::string atom_COMP::getName(void){
+    getvalue.set_pos(0L);
+    getvalue.pos_advance(1+1+4+4+2+4+2);
+    return getvalue._string();
+}
 //TODO: --- SEQU::COMP --- Sequence
 class    atom_SEQU:public atom_COMP
 {
@@ -1204,7 +1292,7 @@ bool atom_MSML::create_object_from_BOB(){
     getvalue.set_pos(0x0L);
     getvalue._u8_assert(0x2);//tag
     getvalue._u8_assert(0x2);//version
-    mobid.makeFrom2(BOB.data()+getvalue.get_pos());
+    mobid.makeFrom2(reinterpret_cast<char*>(BOB.data()+getvalue.get_pos()));
     getvalue.pos_advance(8);
     lastknownvolume = getvalue._string();
     OBJisValid = BOBisValid;
@@ -1291,13 +1379,6 @@ std::string atom_MSML::dump(void) {
 //TODO: ------------------* Attributes ---
 //TODO: --- ATTR::Atom --- (Attributes)
 
-class    atom_ATTR:public avbATOM
-{
-public:  atom_ATTR(){ atom_fourcc = fourcc("ATTR");attrCount=0;}
-    bool create_object_from_BOB();
-    std::string dump(void);
-    uint32_t attrCount ;
-};
 bool atom_ATTR::create_object_from_BOB(){
     OBJisValid = false;
     if (BOBisValid!=true) return OBJisValid;
@@ -1471,12 +1552,22 @@ std::string avbTOC::dump (void){
     }
     return log;
 }
+bool avbTOC::write(std::ofstream *f){
+    bool result = false;
+        for (uint32_t i = 0;i<TOC.size();i++){
+            result |= TOC[i]->write(f);
+        }
+    return result;
+}
 
 avbATOM *  avbTOC:: at (uint32_t TOC_id){
     assert (TOC_id<TOC.size());
     return TOC.at(TOC_id).get();
 };
 
+uint32_t avbTOC::size (void){
+    return static_cast<uint32_t>(TOC.size());
+}
 
 //-----------------------------------------------------------------
 //TODO: add more types to ATOMFactory
@@ -1491,6 +1582,9 @@ ATOMFactory::ATOMFactory()
     
     this -> Register<fourcc("FILE"),atom_FILE>(); //FILE MacFileLocator
     this -> Register<fourcc("WINF"),atom_FILE>(); //WINF WinFileLocator
+    //    this -> Register<fourcc("UNXL"),atom_FILE>(); //UNXL WinFileLocator
+    //    this -> Register<fourcc("TXTL"),atom_TXTL>(); //
+//    this -> Register<fourcc("WINL"),atom_FILE>(); //WINL WinFileLocator
     this -> Register<fourcc("ATTR"),atom_ATTR>(); //ATTR Attributes
     this -> Register<fourcc("MSML"),atom_MSML>(); //MSMLocator
 
@@ -1549,12 +1643,18 @@ ATOMFactory::ATOMFactory()
     this -> Register<fourcc("TKFX"),atom_TKFX>(); //ATrackEffect
 //    this -> Register<fourcc("TKPA"),atom_TKPA>();
 //    this -> Register<fourcc("TKPS"),atom_TKPS>();
+//    this -> Register<fourcc("TMTD"),atom_TMTD>();
+//    this -> Register<fourcc("TMTP"),atom_TMTP>();
+//    this -> Register<fourcc("TRAN"),atom_TRAN>();
+//    this -> Register<fourcc("TRKD"),atom_TRKD>();
 //    this -> Register<fourcc("TMBC"),atom_TMBC>(); //ATmpCrumb
 //    this -> Register<fourcc("TMCS"),atom_TMCS>(); //TmpBreadCrumbs
 //    this -> Register<fourcc("TNFX"),atom_TNFX>(); //ATransEffect
     this -> Register<fourcc("TRKR"),atom_TRKR>(); //ATrackRef
 //    this -> Register<fourcc("URLL"),atom_URLL>();
-//    this -> Register<fourcc("WAVE"),atom_WAVE>(); //WAVEDescriptor
+    //    this -> Register<fourcc("VVAL"),atom_VVAL>();  // SEGM
+    //    this -> Register<fourcc("WAVE"),atom_WAVE>(); //WAVEDescriptor
+    //    this -> Register<fourcc("WAVD"),atom_WAVD>(); //WAVEDescriptor
     }
 
 

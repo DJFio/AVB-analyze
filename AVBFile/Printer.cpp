@@ -79,7 +79,7 @@ std::string  Printer::_hexlify_size_t(size_t x){
 }
 std::string  Printer::_dump (uint32_t pos,uint32_t len){
     if (getvalue->pBytes->size() < pos+len) return std::string("");
-    char* ourdata = getvalue->pBytes->data()+pos;
+    char* ourdata = reinterpret_cast<char*>(getvalue->pBytes->data()+pos);
     const size_t charsinrow = len*4+(len/2)+3;// data(3+1)+ Dashes x2 +1 + endl or zero
     std::vector<char> pretty_data;
     pretty_data.resize(charsinrow+1);// +1 zero
@@ -124,7 +124,7 @@ std::string  Printer::_dump (uint32_t pos,uint32_t len){
 
 std::string  Printer::_pretty_dump (uint32_t pos,uint32_t len){
     if (getvalue->pBytes->size() < pos+len) return std::string("");
-    char* ourdata = getvalue->pBytes->data()+pos;
+    char* ourdata = reinterpret_cast<char*>(getvalue->pBytes->data()+pos);
     const size_t rowlen = 0x20;
     const size_t charsinrow = rowlen*4+16+1;// data(3+1)+8x Dashes x2 + endl or zero
     size_t rows = len/rowlen;

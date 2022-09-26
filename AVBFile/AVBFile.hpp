@@ -18,13 +18,14 @@
 #include "MDVxUUID.hpp"
 
 class AVBFile {
+    
 public:
     AVBFile();
     ~AVBFile();
-    
+
     std::streamsize avbsize = 0;
     std::ifstream avbfile;
-    std::vector<char> bytes;
+    std::vector<uint8_t> bytes;
     Decoder getvalue;
     size_t position = 0;
     size_t ItemsCount = 0;

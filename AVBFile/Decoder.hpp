@@ -21,10 +21,10 @@
 
 class Decoder {
 public:
-    Decoder (std::vector<char> * pVector,bool MM=false) : usebyteswap(MM),pBytes(pVector) ,cp(0)
+    Decoder (std::vector<uint8_t> * pVector,bool MM=false) : usebyteswap(MM),pBytes(pVector) ,cp(0)
     {};
     
-    std::vector<char> * pBytes;
+    std::vector<uint8_t> * pBytes;
 
     void set_bswap(bool bswap=false);
     bool get_bswap(void);

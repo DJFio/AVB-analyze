@@ -117,7 +117,7 @@ std::string  Decoder::_string (void)
         if (*(pBytes->data()+cp+1) == 0x00){
             // then it's a utf-8 string
             cp+=strsz;
-            return std::string(pBytes->data()+cp+2-strsz,strsz-2);
+            return std::string(reinterpret_cast<char*>(pBytes->data()+cp+2-strsz),strsz-2);
         }};
     if (*(pBytes->data()+cp) == 0x00)
     {
@@ -125,14 +125,45 @@ std::string  Decoder::_string (void)
         return std::string("");
     }
     uint32_t state = UTF8_ACCEPT;
-    validate_utf8(&state, pBytes->data()+cp,strsz);
-    cp+=strsz;
+    validate_utf8(&state, reinterpret_cast<char*>(pBytes->data()+cp),strsz);
     if (state==UTF8_ACCEPT) {
-        return std::string(pBytes->data()+cp-strsz,strsz);
+        cp+=strsz;
+        return std::string(reinterpret_cast<char*>(pBytes->data()+cp-strsz),strsz);
+    }
+
+    //decoder for inverted strings.
+    if ((strsz > 4)&&(strsz < 150)) {
+        char         invbuf[150];
+        for (size_t i = 0; i < strsz; i++)
+         {
+             invbuf[i] = ~(*reinterpret_cast<char*>(pBytes->data()+cp+i));
+         }
+        state = UTF8_ACCEPT;
+        validate_utf8(&state, invbuf,strsz);
+        if (state==UTF8_ACCEPT) {
+            cp+=strsz;
+//            return std::string("#INV#").append(std::string(invbuf,strsz));
+            return std::string(invbuf,strsz);
+        }
+    
+    }
+    
+  
+    
+    cp+=strsz;
+    if (strsz > 2) {
+        char const   hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+        char         numtostrbuf[8];
+        numtostrbuf[0]='[';
+        numtostrbuf[1]= hex_chars[ ( *reinterpret_cast<char*>(pBytes->data()+cp-strsz) & 0xF0 ) >> 4 ];
+        numtostrbuf[2]= hex_chars[ ( *reinterpret_cast<char*>(pBytes->data()+cp-strsz) & 0x0F ) >> 0 ];
+        numtostrbuf[3]=' ';
+        numtostrbuf[4]= hex_chars[ ( *reinterpret_cast<char*>(pBytes->data()+cp+1-strsz) & 0xF0 ) >> 4 ];
+        numtostrbuf[5]= hex_chars[ ( *reinterpret_cast<char*>(pBytes->data()+cp+1-strsz) & 0x0F ) >> 0 ];
+        numtostrbuf[6]=']';
+        return std::string("####### BAD STRING [len= ").append(std::to_string(strsz)).append("]").append(std::string(numtostrbuf,7));
     }
     return std::string("####### BAD STRING [len= ").append(std::to_string(strsz)).append("]");
-    //TODO: Make suitable decoder for unknown strings.
-//    return std::string(pBytes->data()+cp-strsz,strsz).append("[BAD STRING CHARACTERS len=").append(std::to_string(strsz)).append("]");
 }
 
 // Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
@@ -188,7 +219,7 @@ uint32_t inline Decoder::validate_utf8(uint32_t *state, char *str, size_t len) {
 
 
 
-std::string  Decoder::_fourcc (void){ cp+=4; return std::string(pBytes->data()+cp-4,4);}
+std::string  Decoder::_fourcc (void){ cp+=4; return std::string(reinterpret_cast<char*>(pBytes->data()+cp-4),4);}
 uint32_t     Decoder::_fourcc_u32 (void)
 {
     uint32_t fcc= MAKEFOURCC(pBytes->data()[cp], pBytes->data()[cp+1],pBytes->data()[cp+2], pBytes->data()[cp+3]);
